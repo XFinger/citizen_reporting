@@ -32,12 +32,11 @@ def initialize
    @am_start = 'T03:00:00-05:00'
    @am_end   = 'T16:00:00-05:00'
    @pm_start = 'T16:30:00-05:00'
-   @pm_end   = 'T24:00:00-05:00'
+   @pm_end   = 'T23:30:00-05:00'
 end
 
 def menu #what type of report to run 
    @shift_data = {}
-	 temp_hash = {}
 	
 	 cli = HighLine.new
 		start_menu = [ "AM shift report",
@@ -113,7 +112,7 @@ def menu #what type of report to run
 		end
 
 	@shift_data = {'date' => @date.strftime("%A %b %e %Y "), 'report_type' => @report_type}
- 
+   
   build_reports
  
 end
@@ -128,10 +127,11 @@ def build_reports
     to_pdf
     cleanup #+ return to menu
   else
-    #  accounting_interview
+    accounting_interview
     poll_square
-    accounting_math(@payments)
-    #accounting_pdf
+    do_the_math(@payments)
+    accounting_math 
+    accounting_pdf
     #cleanup #+ return to menu
   end
 
@@ -182,7 +182,7 @@ def interview #get servers count & names, payouts, pay-ins ...
   #get breakfast wait staff name, cc tips & cash tips
   if @shift_data['report_type'] == 'AM' 
     b_servers_count = cli.ask("Number of Servers for Breakfast Shift: ", Integer)
-    if b_servers_count > 0
+     if b_servers_count > 0
         b_servers_count.times do  
           bcount += 1
           b_server_names << cli.ask( "Breakfast Server # #{bcount} name: ", String)
@@ -192,7 +192,7 @@ def interview #get servers count & names, payouts, pay-ins ...
     end
   end
 
-  #get lunch data
+  #get lunch/dinner data
 	servers_count = cli.ask( "Number of Servers (lunch/dinner don't include cashier): ", Integer)
 	servers_count.times do  
 		count += 1
@@ -243,6 +243,7 @@ def poll_square
                    headers: REQUEST_HEADERS,
                    parameters: parameters
 
+            
       # Read the converted JSON body into the cumulative array of results
       @payments += response.body
 
@@ -274,10 +275,13 @@ def do_the_math(payments)
   collected_money = taxes = tips = discounts = processing_fees = cash_sales = gift_card_sales = check_sales =
                     credit_card_sales = returned_processing_fees = net_money = refunds = gift_cards_sold = 
                     counter = cc_refund = cash_refund = transactions = register_close = cash_tips_collected =
-                    total_tips = am_tips = am_tips_each = lunch_tips = lunch_tips_each = dinner_tips_each = 
-                    lunch_tips = dinner_tips = food_sales = 0
+                    total_tips = food_sales = credit_tips = 0
   gift_card = []
   temp_hash = {}
+  shift_tips = {}
+  breakfast_tips = {}
+  lunch_tips = {}
+  dinner_tips = {}
   
   # Add values to each cumulative variable
   
@@ -329,69 +333,80 @@ def do_the_math(payments)
         returned_processing_fees = returned_processing_fees + (payment['processing_fee_money']['amount'] * percentage_refunded) 
     end     
   end
- 
-  #base_purchases = collected_money - taxes - tips + refunds
+  
+  #get credit_tips for accounting report
+  credit_tips = tips
  
   #report type data specific => reuse poll_square for both report types 
-  if @shift_data['report_type'] = 'AM' || @shift_data['report_type'] = 'PM'
+  #register math
+  if @shift_data['report_type'] == 'AM' || @shift_data['report_type'] == 'PM'
 
-      #register_count -payouts -purchases -drops +pay_ins +cash_refund +cash_sales -tips(credit payouts) 
+      #register_count -payouts -purchases -drops +pay_ins +cash_refund +cash_sales -tips(credit payouts)  + gift_card_sales
       register_close = (@shift_data['register_count'] - @shift_data['payouts'] - @shift_data['purchases'] - 
-                        @shift_data['drops']+ @shift_data['pay_ins'] + (cash_refund) + (cash_sales)  - (tips)  
-                       )
-      difference = @shift_data['register_start'] - (register_close + (tips) - (cash_sales) + (cash_refund))
+                        @shift_data['drops'] + @shift_data['pay_ins'] + cash_refund + cash_sales - tips + 
+                        gift_card_sales )
+      difference = @shift_data['register_start'] - (register_close + tips - cash_sales + cash_refund - gift_card_sales)
+  
+
+      # get tip data breakfast & lunch or dinner
+      cash_tips_collected = @shift_data['cash_tips'] + @shift_data['cash_b_tips']
+      total_tips =  cash_tips_collected + tips
+    
+      #tip hash - total, breakfast, lunch, dinner  => total, cash, credit
+      shift_tips        =  { 'total'   => total_tips,
+                            'cash'    => cash_tips_collected, 
+                            'credit'  => tips }
+      
+      
+      if @shift_data['report_type'] == 'AM' 
+        
+        #avoid division by 0 in edge case where there are no tips or there is no breakfast server
+        if (@shift_data['cash_b_tips'] + @shift_data['credit_b_tips']) > 0 && @shift_data['b_server_names'].size > 0
+          breakfast_tips  = { 'total'   => @shift_data['cash_b_tips'] + @shift_data['credit_b_tips'],  
+                              'cash'    => @shift_data['cash_b_tips'], 
+                              'credit'  => @shift_data['credit_b_tips'],    
+                              'each'    => (@shift_data['cash_b_tips'] + @shift_data['credit_b_tips'])/@shift_data['b_server_names'].size }
+        end
+
+        lunch_tips      = { 'total'   => total_tips - (@shift_data['cash_b_tips'] + @shift_data['credit_b_tips']), 
+                            'cash'    => cash_tips_collected - @shift_data['cash_b_tips'], 
+                            'credit'  => tips - @shift_data['credit_b_tips'],
+                            'each'    => (total_tips - (@shift_data['cash_b_tips'] + @shift_data['credit_b_tips']))/@shift_data['server_names'].size }
+      else
+    
+        dinner_tips     = { 'each'    => total_tips/@shift_data['server_names'].size }
+      end
   end
-
-  # get tip data am lunch pm
-  cash_tips_collected = @shift_data['cash_tips'] + @shift_data['cash_b_tips']
-  total_tips =  cash_tips_collected + tips
-
-  if @shift_data['report_type'] = 'AM'
-    am_tips         =  @shift_data['cash_b_tips'] + @shift_data['credit_b_tips'] 
-    am_tips_each    = fm(am_tips/@shift_data['b_server_names'].size)
-    lunch_tips      = fm(total_tips - am_tips)
-    lunch_tips_each = fm((total_tips - am_tips)/@shift_data['server_names'].size) 
-  elsif @shift_data['report_type'] = 'PM'     
-    dinner_tips_each  = (total_tips/@shift_data['server_names'].size) 
-  end 
-          
-
-#######!!!!!!!!!!add gift_card_sales to register total and account for it in reg diff
-#######          remove gift cards sold from overall food sales/ abc sales
 
   #add responses to hash
   temp_hash = { 'transactions'  => transactions,
-          'refunds'             => fm(refunds), 
-          'cash_refunds'        => fm(cash_refund),
-          'credit_refunds'      => fm(cc_refund), 
-          'gift_cards_sold'     => fm(gift_cards_sold), #value of new cards sold
-          'gift_card_sales'     => fm(gift_card_sales), #value of card sales
+          'refunds'             => refunds, 
+          'cash_refunds'        => cash_refund,
+          'credit_refunds'      => cc_refund, 
+          'gift_cards_sold'     => gift_cards_sold, #value of new cards sold
+          'gift_card_sales'     => gift_card_sales, #value of card sales
           'gift_card'           => gift_card,  #array of new cards sold
-          'cash_sales'          => fm(cash_sales),
-          'credit_card_sales'   => fm(credit_card_sales),
-          'check_sales'         => fm(check_sales),
-
-          'gross sales'         => fm(collected_money - taxes - tips + refunds),
-          'net_sales'           => fm(collected_money - taxes - tips + refunds - discounts),
-          'net_total'           => fm(net_money + refunds - returned_processing_fees),
-          'food_sales'          => fm(collected_money - taxes - tips + refunds - discounts - gift_cards_sold), #-abc sales
+          'cash_sales'          => cash_sales,
+          'credit_card_sales'   => credit_card_sales,
+          'check_sales'         => check_sales,
+          'gross sales'         => collected_money - taxes - tips + refunds,
+          'net_sales'           => collected_money - taxes - tips + refunds - discounts,
+          'net_total'           => net_money + refunds - returned_processing_fees,
+          'food_sales'          => collected_money - taxes - tips + refunds - discounts - gift_cards_sold, #-abc sales #refunds ? may not be food?
         #  'abc_sales'           => fm() net_sales - food_sales - gift_cards_sold
         #  'abc_split'           => fm() beer/wine, liquor
 
-          'discounts'           => fm(discounts),
-          'fees'                => fm(processing_fees),
-          'fees_returned'       => fm(returned_processing_fees),
-          'tax_collected'       => fm(taxes),
-          'total_tips'          => fm(total_tips),
-          'cash_tips_collected' => fm(cash_tips_collected),
-          'cc_tips_collected'   => fm(tips), 
-          'am_tips'             => fm(am_tips),
-          'am_tips_each'        => am_tips_each,
+          'discounts'           => discounts,
+          'fees'                => processing_fees,
+          'fees_returned'       => returned_processing_fees,
+          'tax_collected'       => taxes,
+          'credit_tips'         => credit_tips,
+          'shift_tips'          => shift_tips,
+          'breakfast_tips'      => breakfast_tips, 
           'lunch_tips'          => lunch_tips,
-          'lunch_tips_each'     => lunch_tips_each,
-          'dinner_tips_each'    => dinner_tips_each,                        
-          'register_close'      => fm(register_close),
-          'difference'          => fm(difference)
+          'dinner_tips'         => dinner_tips,         
+          'register_close'      => register_close,
+          'difference'          => difference
         }
     @shift_data.merge!(temp_hash)
 
@@ -413,8 +428,8 @@ def cli_out #output data to the screen
   puts 'Check Sales     ' + @shift_data['check_sales'].to_s
   puts 'Gift Card Sales ' + @shift_data['gift_card_sales'].to_s
   puts 'Cash refunds    ' + @shift_data['cash_refunds'].to_s
-  puts 'Cash Tips       ' + @shift_data['cash_tips_collected'].to_s
-  puts 'CC Tips         ' + @shift_data['cc_tips_collected'].to_s
+  #puts 'Cash Tips       ' + @shift_data['cash_tips_collected'].to_s
+  #puts 'CC Tips         ' + @shift_data['cc_tips_collected'].to_s
   puts 'Register Close  ' + @shift_data['register_close'].to_s  
 
 end
@@ -424,50 +439,63 @@ def to_pdf
   tip = []
   net_data = []
 
- print_hash
-
-  Prawn::Document.generate('hello.pdf') do |pdf|
+  Prawn::Document.generate("#{@date}_#{@shift_data['report_type']}_report.pdf" ) do |pdf|
     pdf.stroke_color 'e8ebef'
+    
     #Register Data
     reg_data = ([["Cashier", @shift_data['cashier']],
-                 ["Register Open", @shift_data['register_start']],
-                 ["Cash Sales", @shift_data['cash_sales']],
-                 ["Gift Certificate Sales", @shift_data['gift_card_sales']],
-                 ["Check Sales", @shift_data['check_sales']],
-                 ["Cash Returns", @shift_data['cash_refunds']],
-                 ["Purchases", @shift_data['purchases']],
-                 ["Payouts", @shift_data['payouts']],
-                 ["Drops", @shift_data['drops']], 
-                 ["Pay Ins", @shift_data['pay_ins']],
-                 ["Register Close", @shift_data['register_close']],
-                 ["Credit Tip Payouts", @shift_data['cc_tips_collected']],
-                 ["Register Difference", @shift_data['difference']]
+                 ["Register Open", fm(@shift_data['register_start'])],
+                 ["Cash Sales", fm(@shift_data['cash_sales'])],
+                 ["Gift Certificate Sales", fm(@shift_data['gift_card_sales'])],
+                 ["Check Sales", fm(@shift_data['check_sales'])],
+                 ["Cash Returns", fm(@shift_data['cash_refunds'])],
+                 ["Purchases", fm(@shift_data['purchases'])],
+                 ["Payouts", fm(@shift_data['payouts'])],
+                 ["Drops", fm(@shift_data['drops'])], 
+                 ["Pay Ins", fm(@shift_data['pay_ins'])],
+                 ["Register Close", fm(@shift_data['register_close'])],
+                 ["Credit Tip Payouts", fm(@shift_data['shift_tips']['credit'])],
+                 ["Register Difference", fm(@shift_data['difference'])]
       ])
+    
     #Net Data
-    net_data = ([["Net Food Sales",@shift_data['food_sales']],
-                 ["Net ABC Sales", "pending data "],
-                 ["Gift Certificate Sold", @shift_data['gift_cards_sold']], #add array of ttl and each_value
-                 ["Discounts", @shift_data['discounts']],
-                 ["Returns", @shift_data['refunds']],
-                 ["Net Sales", @shift_data['net_sales']],
-                 ["Tax on Sales", @shift_data['tax_collected']],
+    net_data = ([["Net Food Sales",fm(@shift_data['food_sales'])],
+                 ["Net ABC Sales", "soon "],
+                 ["Gift Certificate Sold", fm(@shift_data['gift_cards_sold'])], #add array of ttl and each_value
+                 ["Discounts", fm(@shift_data['discounts'])],
+                 ["Returns", fm(@shift_data['refunds'])],
+                 ["Net Sales", fm(@shift_data['net_sales'])],
+                 ["Tax on Sales", fm(@shift_data['tax_collected'])],
                  ["Transactions", @shift_data['transactions']]
       ]) 
     
-    #Split up tips
-    tip << (["Total Tips (ttl-cash-credit)", @shift_data['total_tips'].to_s + " - " + @shift_data['cash_tips_collected'].to_s + " - " + @shift_data['cc_tips_collected'].to_s ]) 
-    tip << (["Breakfast Tips", @shift_data['am_tips']])
-    @shift_data['b_server_names'].each do |bname|
-      tip << (["\u2022  " + bname.capitalize, @shift_data['am_tips_each']])
-    end
-     
-    tip << (["Lunch Tips",  @shift_data['lunch_tips']])
+    #Tip Data
+    #adjust for pm shift don't show breakfast and rename lunch to dinner
+
+    tip << ["Tips", "<font size='10'>(total - cash - credit)</font>" ] 
+    tip << ["Total Tips", fm(@shift_data['shift_tips']['total']).to_s + " - " + fm(@shift_data['shift_tips']['cash']).to_s + " - " + fm(@shift_data['shift_tips']['credit']).to_s ] 
+
     
-    @shift_data['server_names'].each do |name|
-      tip << (["\u2022  " + name.capitalize,  @shift_data['lunch_tips_each']])
+    if @shift_data['report_type'] == 'AM'
+      if !@shift_data['breakfast_tips'].empty? #avoid edge case with division by 0
+        tip <<  ["Breakfast Tips ", fm(@shift_data['breakfast_tips']['total']).to_s + " - " + fm(@shift_data['breakfast_tips']['cash']).to_s + " - " + fm(@shift_data['breakfast_tips']['credit']).to_s ] 
+        @shift_data['b_server_names'].each do |bname|
+          tip << ["\u2022  " + bname.capitalize, fm(@shift_data['breakfast_tips']['each'])]
+        end
+      end
+
+      tip << ["Lunch Tips ", fm(@shift_data['lunch_tips']['total']).to_s + " - " + fm(@shift_data['lunch_tips']['cash']).to_s + " - " + fm(@shift_data['lunch_tips']['credit']).to_s ]
+      @shift_data['server_names'].each do |name|
+        tip << ["\u2022  " + name.capitalize, fm( @shift_data['lunch_tips']['each'])]
+      end
+    else
+        #tip << ["Dinner Tips        <font size='9'>(total - cash - credit)</font> ", @shift_data['lunch_tips'].to_s + " - " + @shift_data['lunch_cash_tips'].to_s + " - " + @shift_data['lunch_credit_tips'].to_s]
+        @shift_data['server_names'].each do |name|
+          tip << ["\u2022  " + name.capitalize,  fm(@shift_data['dinner_tips']['each'])]
+        end
     end
-
-
+    
+    #if register diff = 0 show the duck
     if @shift_data['difference'] == 0
       duck = "../assets/images/duckling3.png"
       pdf.image duck, :position => :right, :vposition => :top, :scale => 0.08
@@ -475,105 +503,134 @@ def to_pdf
     end
     
     pdf.text("Citizen Daily Reconciliation", size: 15, style: :bold)
-    pdf.text(@shift_data['date'] + @shift_data['report_type'], size: 15, style: :bold  )   
+    pdf.text(@shift_data['date'] + @shift_data['report_type'], size: 15, style: :bold)
+    unless @shift_data['notes'].empty?
+      pdf.move_down 10
+      pdf.text("Shift Notes: " + @shift_data['notes'])
+    end
+
     pdf.move_down 5 
     pdf.stroke_horizontal_rule
     pdf.move_down 5 
     pdf.table(reg_data, :cell_style =>
-     { :padding => [3,5], :border_width => [0,0], :width => 200 }) 
+     { :padding => [3,0], :border_width => [0,0] }) do
+        column(0).align = :left
+        column(1).align = :right
+        column(0).width = 230
+        column(1).width = 80
+      end 
+
     pdf.move_down 5
     pdf.stroke_horizontal_rule
-    pdf.move_down 5
+    pdf.move_down 10
     pdf.table(tip, :cell_style =>
-     { :padding => [3,5], :border_width => [0,0], :width => 200 }) 
-    pdf.move_down 5
+     { :padding => [3,0], :border_width => [0,0], :inline_format => true }) do
+        column(0..2).align = :left
+        column(0).width = 230
+      end
+
+    pdf.move_down 10
     pdf.stroke_horizontal_rule 
     pdf.move_down 5
     pdf.table(net_data, :cell_style =>
-     { :padding => [3,5], :border_width => [0,0], :width => 200 })
+     { :padding => [3,0], :border_width => [0,0] }) do
+        column(0).align = :left
+        column(1).align = :right
+        column(0).width = 230
+        column(1).width = 80  
+      end 
 
-    unless @shift_data['notes'].empty?
-      pdf.move_down 10
-      pdf.text("Shift Notes: " + @shift_data['notes'], :padding => [3,5])
-    end
   end
 end
 
 def accounting_interview #get data for daily accounting sheet
     @accounting_data = {}
-    cli = HighLine.new
-    food_purchases = cli.ask( "Food Purchases: ", Float),
-    supplies = cli.ask( "Supplies: ", Float),
-    repairs = cli.ask( "Repairs: ", Float),
-    laundry = cli.ask( "Laundry: ", Float),
-    office_supplies = cli.ask( "Office Supplies: ", Float) 
-    temp_hash = { 'food_purchases ' =>  food_purchases,
-                  'supplies' => supplies,
-                  'repairs' => repairs,
-                  'laundry' => laundry,
-                  'office_supplies' => office_supplies
+    temp_hash = {}
+    supplies = repairs = laundry = office_supplies = food_purchases = 0
+
+    q = HighLine.new
+      food_purchases  = q.ask("Food Purchases: ", Float) 
+      supplies        = q.ask("Supplies: ", Float) 
+      repairs         = q.ask("Repairs: ", Float) 
+      laundry         = q.ask("Laundry: ", Float) 
+      office_supplies = q.ask("Office Supplies: ", Float) 
+
+    temp_hash = { 'food_purchases'  =>  to_pennies(food_purchases),
+                  'supplies'        =>  to_pennies(supplies),
+                  'repairs'         =>  to_pennies(repairs),
+                  'laundry'         =>  to_pennies(laundry),
+                  'office_supplies' =>  to_pennies(office_supplies)
               }
     @accounting_data.merge!(temp_hash)
 
 end
 
-def accounting_math(payments)
-  tax_ary = {}
-  tax_ary << @shift_data['tax_collected']
-  tax_ary << ttl_tax * 6%
+def accounting_math 
+  puts @shift_data
+  taxes = {}
+  taxes =  {"total" => @shift_data['tax_collected'], "city" => (@shift_data['tax_collected'] * 0.06 ) }
+  #tax_ary << ttl_tax * 6%
   total_dispursments = (@accounting_data['food_purchases'] +
                         @accounting_data['supplies'] +
                         @accounting_data['repairs'] +
                         @accounting_data['laundry'] +
                         @accounting_data['office_supplies']) 
-  charge_deposit = @shift_data['credit_card_sales'] + @shift_data['credit_refunds'] + @shift_data['credit_card_fees'] -  @shift_data['cc_tips_collected']
+  
+  charge_deposit = @shift_data['credit_card_sales'] + @shift_data['credit_refunds'] + @shift_data['fees'] + @shift_data['fees_returned'] +  @shift_data['credit_tips']
 
-  temp_hash = { 'food_sales' =>  @shift_data['net_total'],
-                'abc_sales' => " ",
-                'sales_tax' =>   tax_ary,
-                'total' =>  (@shift_data['net_total'] + @shift_data['tax_collected']),
-                'cc_fees' => @shift_data['fees'] - @shift_data['fees_returned'],
-                'gift_certificate_sales' => @shift_data['gift_card_sales'],
-                'charge_tip_payout' => @shift_data['cc_tips_collected'],
-                'total_dispursements' => total_dispursments,
-                'cash_deposit' => (@shift_data['cash_sales'] - @shift_data['cash_refunds']),
-                'charge_deposit' => charge_deposit
+  temp_hash = { 'food_sales'              => @shift_data['food_sales'], #-abc sales
+                'abc_sales'               => " soon ",
+                'gc_sold'                 => @shift_data['gift_cards_sold'],
+                'sales_tax'               => taxes,
+                'total'                   => @shift_data['food_sales'] + @shift_data['gift_cards_sold'] + taxes['total'], #+abc sales
+                'cc_fees'                 => @shift_data['fees'] - @shift_data['fees_returned'],
+                'gift_certificate_sales'  => @shift_data['gift_card_sales'],
+                'charge_tip_payout'       => @shift_data['credit_tips'],
+                'total_dispursements'     => total_dispursments,
+                'cash_deposit'            => @shift_data['cash_sales'] - @shift_data['cash_refunds'] - @shift_data['credit_tips'],
+                'charge_deposit'          => charge_deposit
 
               }
   @accounting_data.merge!(temp_hash)
-  puts @accounting_data
+  
   
 end
 
 def accounting_pdf #report for accountant
-  Prawn::Document.generate("#{Date.today}_accounting.pdf" ) do |pdf|
+  Prawn::Document.generate("#{@date}_accounting.pdf" ) do |pdf|
    
 
-    part1 = ([ [{:content => "Food Sales", :colspan => 2}, "600", "5555.55"],
-               [{:content => "ABC Sales", :colspan => 2}, " ", "  "],
-               [{:content => "Sales Tax", :colspan => 2},"442",""],
-               [{:content =>  "Total", :colspan => 2}," "," "],
+    part1 = ([ [{:content =>  "Food Sales", :colspan => 2}, "600", fm(@accounting_data['food_sales']) ],
+               [{:content =>  "ABC Sales", :colspan => 2}, " ", " soon  "],
+               [{:content =>  "Sales Tax", :colspan => 2},"442", fm(@accounting_data['sales_tax']['total'])],
+               [{:content =>  "GC Sold", :colspan => 2}," ", fm(@accounting_data['gc_sold'])],
+               [{:content =>  "Total", :colspan => 2}," ", fm(@accounting_data['total'])],
                [{:content =>  " ", :colspan => 2}," "," "],    
-               [{:content =>  "Food Purchases", :colspan => 2},"710","5555.55"],
-               [{:content =>  "Supplies", :colspan => 2},"884",""],
-               [{:content =>  "Repairs", :colspan => 2},"878",""],
-               [{:content =>  "Laundry", :colspan => 2},"858",""],
-               [{:content =>  "Office Supplies", :colspan => 2},"882",""],
-               [{:content =>  "Credit Card Fee", :colspan => 2}],
-               [{:content =>  "GC Redeemed", :colspan => 2},"",""],
-               [{:content =>  "Charge Tip Payout", :colspan => 2},"",""],
-               [{:content =>  "Total Disbursements", :colspan => 2},"",""],
+               [{:content =>  "Food Purchases", :colspan => 2},"710",fm(@accounting_data['food_purchases'])],
+               [{:content =>  "Supplies", :colspan => 2},"884", fm(@accounting_data['supplies'])],
+               [{:content =>  "Repairs", :colspan => 2},"878", fm(@accounting_data['repairs'])],
+               [{:content =>  "Laundry", :colspan => 2},"858", fm(@accounting_data['laundry'])],
+               [{:content =>  "Office Supplies", :colspan => 2},"882", fm(@accounting_data['office_supplies'])],
+               [{:content =>  "Credit Card Fee", :colspan => 2}, " ", fm(@accounting_data['cc_fees'])],
+               [{:content =>  "GC Redeemed", :colspan => 2},"",fm(@accounting_data['gift_certificate_sales'])],
+               [{:content =>  "Charge Tip Payout", :colspan => 2},"",fm(@shift_data['credit_tips'])],
+               [{:content =>  "Total Disbursements", :colspan => 2},"",fm(@accounting_data['total_dispursements'])],
                [{:content =>  " ", :colspan => 2}," "," "], 
-               [{:content =>  "Cash Deposit", :colspan => 2},"105",""],
-               [{:content =>  "Charge Deposit", :colspan => 2}, "106",""],
-               [{:content =>  "Total Receipts", :colspan => 2},"","Total Receipts"]
+               [{:content =>  "Cash Deposit", :colspan => 2},"105",fm(@accounting_data['cash_deposit'])],
+               [{:content =>  "Charge Deposit", :colspan => 2}, "106",fm(@accounting_data['charge_deposit'])],
+               [{:content =>  "Total Receipts", :colspan => 2},"",fm(@accounting_data['cash_deposit'] + @accounting_data['charge_deposit'])]
       ])
 
     pdf.text("Citizen", size: 16, style: :bold)
     pdf.text(@shift_data['date'], size: 16, style: :bold)
     pdf.move_down 20
-    pdf.table(part1, :width => 600, :cell_style =>
-     { :border_width => [0,0], size: 15, style: :bold })
+    pdf.table(part1, :width => 500, :cell_style =>
+     { :border_width => [0,0], size: 15, style: :bold}) do
+        column(0).align = :left
+        column(1).align = :left
+        column(2).align = :left  
+        column(3).align = :right
+      end
  
   end
 
