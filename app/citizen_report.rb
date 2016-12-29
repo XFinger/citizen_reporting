@@ -31,7 +31,7 @@ def initialize
    #AM PM shift hours
    @am_start = 'T03:00:00-05:00'
    @am_end   = 'T16:00:00-05:00'
-   @pm_start = 'T16:30:00-05:00'
+   @pm_start = 'T16:01:00-05:00'
    @pm_end   = 'T23:30:00-05:00'
 end
 
@@ -124,6 +124,7 @@ def build_reports
     poll_square
     do_the_math(@payments)
     cli_out
+    looking_good
     to_pdf
     cleanup #+ return to menu
   else
@@ -132,7 +133,7 @@ def build_reports
     do_the_math(@payments)
     accounting_math 
     accounting_pdf
-    #cleanup #+ return to menu
+    cleanup #+ return to menu
   end
 
 end
@@ -409,30 +410,43 @@ def do_the_math(payments)
           'difference'          => difference
         }
     @shift_data.merge!(temp_hash)
-
-
   
 end
 
 def cli_out #output data to the screen
-  
-  puts 'Date            ' + @shift_data['date'] + @shift_data['report_type']
-  puts 'Transactions    ' + @shift_data['transactions'].to_s
-  puts 'Register Open   ' + @shift_data['register_start'].to_s
-  puts 'Pay-ins         ' + @shift_data['pay_ins'].to_s
-  puts 'Payouts         ' + @shift_data['payouts'].to_s
-  puts 'Purchases       ' + @shift_data['purchases'].to_s 
-  puts 'Drops           ' + @shift_data['drops'].to_s
-  puts 'Register Count  ' + @shift_data['register_count'].to_s 
-  puts 'Cash Sales      ' + @shift_data['cash_sales'].to_s
-  puts 'Check Sales     ' + @shift_data['check_sales'].to_s
-  puts 'Gift Card Sales ' + @shift_data['gift_card_sales'].to_s
-  puts 'Cash refunds    ' + @shift_data['cash_refunds'].to_s
-  #puts 'Cash Tips       ' + @shift_data['cash_tips_collected'].to_s
-  #puts 'CC Tips         ' + @shift_data['cc_tips_collected'].to_s
-  puts 'Register Close  ' + @shift_data['register_close'].to_s  
+  puts " "
+  puts " "
+  puts 'Date             ' + @shift_data['date'] + @shift_data['report_type']
+  puts 'Transactions     ' + @shift_data['transactions'].to_s
+  puts 'Register Open    ' + @shift_data['register_start'].to_s
+  puts 'Register Close   ' + @shift_data['register_close'].to_s  
+  puts 'Difference       ' + @shift_data['difference'].to_s 
 
+  if @shift_data['report_type'] == "AM"
+    puts 'Tips             ' + @shift_data['shift_tips'].to_s 
+  else
+    puts 'Tips             ' + @shift_data['shift_tips'].to_s 
+  end
+  puts " " 
 end
+
+def looking_good # based on cli_out info, continue to create pdf or restart the interview
+    cli = HighLine.new
+    start_menu = [ "Looks Good, create the pdf",
+                   "Something isn't right, go back" 
+                  ]
+
+    cli.choose do |menu|
+      menu.prompt = 'Make your choice: '
+      menu.choices(*start_menu) do |chosen|   
+        if chosen == "Something isn't right, go back" 
+          system "clear" #clear the terminal
+          menu #go back to main menu
+        end
+      end
+    end
+end
+
 
 def to_pdf
   reg_data = []
@@ -472,7 +486,7 @@ def to_pdf
     #Tip Data
     #adjust for pm shift don't show breakfast and rename lunch to dinner
 
-    tip << ["Tips", "<font size='10'>(total - cash - credit)</font>" ] 
+    tip << ["Tips", "<font size='12'>(total - cash - credit)</font>" ] 
     tip << ["Total Tips", fm(@shift_data['shift_tips']['total']).to_s + " - " + fm(@shift_data['shift_tips']['cash']).to_s + " - " + fm(@shift_data['shift_tips']['credit']).to_s ] 
 
     
@@ -541,6 +555,8 @@ def to_pdf
       end 
 
   end
+
+  FileUtils.move  "#{@date}_#{@shift_data['report_type']}_report.pdf" , "c:/Users/citizen/Desktop/Reports/#{@date}_#{@shift_data['report_type']}_report.pdf"
 end
 
 def accounting_interview #get data for daily accounting sheet
@@ -566,7 +582,6 @@ def accounting_interview #get data for daily accounting sheet
 end
 
 def accounting_math 
-  puts @shift_data
   taxes = {}
   taxes =  {"total" => @shift_data['tax_collected'], "city" => (@shift_data['tax_collected'] * 0.06 ) }
   #tax_ary << ttl_tax * 6%
@@ -634,12 +649,15 @@ def accounting_pdf #report for accountant
  
   end
 
+  FileUtils.move  "#{@date}_accounting.pdf" , "c:/Users/citizen/Desktop/Reports/#{@date}_accounting.pdf"
 end
 
-def cleanup #move generated files to google drive folder
+def cleanup #move generated files to google drive folder clear the terminal and return to the menu
   
-  #system "clear" #clear the terminal
-  menu #go back to main menu
+  system "clear"  #clear the terminal
+  puts 'PDF document created'
+  puts ' '
+  menu            #go back to main menu
 
 end
 
