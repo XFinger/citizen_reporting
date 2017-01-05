@@ -62,7 +62,6 @@ GEM
       mini_portile2 (~> 2.1.0)
     paint (1.0.1)
     pdf-core (0.6.1)
-    pdfkit (0.8.2)
     prawn (2.1.0)
       pdf-core (~> 0.6.1)
       ttfunk (~> 1.4.0)
@@ -133,13 +132,13 @@ DEPENDENCIES
   configatron
   highline
   json
-  pdfkit
   prawn
   prawn-table
   rails_semantic_logger
   restclient
   ruby-progressbar
   rubyzip
+  tzinfo
   unirest
 
 BUNDLED WITH
