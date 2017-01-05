@@ -536,7 +536,7 @@ def to_pdf
     if @shift_data['difference'] == 0  && Date.today < Date.new(2017,2,1)
       #duck = "../assets/images/duckling3.png"
       #path for windows
-      duck = "c:/Users/citizen/Documents/citizen_reporting/assets/images/duckling3.png"
+      duck = "c:/Users/citizen/Documents/reports/citizen_reporting/assets/images/duckling3.png"
       pdf.image duck, :position => :right, :vposition => :top, :scale => 0.08
       pdf.move_up 40
     end
