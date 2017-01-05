@@ -31,8 +31,8 @@ def initialize
    #AM PM shift hours
    @am_start = 'T03:00:00-05:00'
    @am_end   = 'T16:00:00-05:00'
-   @pm_start = 'T16:01:00-05:00'
-   @pm_end   = 'T23:30:00-05:00'
+   @pm_start = 'T16:00:00-05:00'
+   @pm_end   = 'T23:45:00-05:00'
 end
 
 def menu #what type of report to run 
@@ -53,14 +53,14 @@ def menu #what type of report to run
 		  menu.choices(*start_menu) do |chosen|		
 			case chosen
 			    when "AM shift report"
-			      @begin_time = Date.today.to_s +  @am_start
-					  @end_time = Date.today.to_s +  @am_end
+			      @begin_time = Date.today.to_s + @am_start
+					  @end_time = Date.today.to_s + @am_end 
 					  @date = Date.today 
 					  @report_type = 'AM'
 
 			    when "PM shift report"
 			    	@begin_time = Date.today.to_s + @pm_start
-					  @end_time = Date.today.to_s + @pm_end
+					  @end_time = Date.today.to_s +  @pm_end
 					  @date = Date.today 
 					  @report_type = 'PM'
 
@@ -81,8 +81,8 @@ def menu #what type of report to run
             |q| q.default = Date.today.to_s;
                 q.validate = lambda { |p| Date.parse(p) <= Date.today };
                 q.responses[:not_valid] = "Enter a valid date less than or equal to today"}
-            @begin_time = custom_date.to_s + @pm_start
-            @end_time = custom_date.to_s + @pm_end
+            @begin_time = Time.parse(custom_date.to_s + @pm_start).iso8601
+            @end_time = Time.parse(custom_date.to_s + @pm_end).iso8601
             @date = custom_date 
             @report_type = 'PM'           
 
@@ -232,9 +232,9 @@ def poll_square
   # URL-encode all parameters
   parameters = URI.encode_www_form(
     'begin_time' => @begin_time,
-	  'end_time'   => @end_time
+    'end_time'   => @end_time
   )
-
+ 
     request_path = CONNECT_HOST + '/v1/' + LOCATION_ID + '/payments?' + parameters
     more_results = true
     while more_results do
@@ -243,8 +243,7 @@ def poll_square
       response = Unirest.get request_path,
                    headers: REQUEST_HEADERS,
                    parameters: parameters
-
-            
+             
       # Read the converted JSON body into the cumulative array of results
       @payments += response.body
 
@@ -267,22 +266,24 @@ def poll_square
       end
   end
 
-  
+   
 end
 
 def do_the_math(payments)
-
+ 
   # Variables - set all to zero
   collected_money = taxes = tips = discounts = processing_fees = cash_sales = gift_card_sales = check_sales =
                     credit_card_sales = returned_processing_fees = net_money = refunds = gift_cards_sold = 
                     counter = cc_refund = cash_refund = transactions = register_close = cash_tips_collected =
-                    total_tips = food_sales = credit_tips = 0
+                    total_tips = food_sales = credit_tips =  beer_money = wine_money = liquor_money = 
+                    alco_discount = food_discount = 0
   gift_card = []
   temp_hash = {}
   shift_tips = {}
   breakfast_tips = {}
   lunch_tips = {}
   dinner_tips = {}
+  abc_sales = {}
   
   # Add values to each cumulative variable
   
@@ -308,14 +309,41 @@ def do_the_math(payments)
     		when "CHECK"
     			check_sales	= check_sales	+ payment['tender'][0]['total_money']['amount']
     	end
+   
+    #get alcohol sales & discounts
+     payment['itemizations'].each do |alco|
+       if alco['item_detail']['category_name'] == 'Beer'
+         beer_money += alco['gross_sales_money']['amount']
+         alco_discount += alco['discount_money']['amount'] 
+        
+       elsif alco['item_detail']['category_name'] == 'Wine'
+         wine_money += alco['gross_sales_money']['amount']
+         alco_discount += alco['discount_money']['amount'] 
   
+       elsif alco['item_detail']['category_name'] == 'Liquor'
+         liquor_money += alco['gross_sales_money']['amount']
+         alco_discount += alco['discount_money']['amount']       
+       end
+     end 
+     
+     abc_sales = {'abc_total'     => beer_money + wine_money + liquor_money,
+                  'beer_money'    => beer_money,
+                  'wine_money'    => wine_money,
+                  'liquor_money'  => liquor_money
+                }
+
+    #split food/alcohol discounts (negative numbers)
+    food_discount = discounts - alco_discount
+
+
     #get array of new gift card sales
-   	payment['itemizations'].each do |gc|
-  		if gc['name'] == 'Gift Certificate'
-  			gift_card << gc['net_sales_money']['amount']  #array of new gc sold 
-  			gift_cards_sold += gc['net_sales_money']['amount'] #total value of new gift cards
-  		end
-  	end
+    payment['itemizations'].each do |gc|
+      if gc['name'] == 'Gift Certificate'
+        gift_card << gc['net_sales_money']['amount']  #array of new gc sold 
+        gift_cards_sold += gc['net_sales_money']['amount'] #total value of new gift cards
+      end
+    end
+  	 
   	
   	#get breakdown of refunded money type (cash/credit)
   	 if  payment['tender'][0]['refunded_money']['amount'] < 0
@@ -334,7 +362,7 @@ def do_the_math(payments)
         returned_processing_fees = returned_processing_fees + (payment['processing_fee_money']['amount'] * percentage_refunded) 
     end     
   end
-  
+ 
   #get credit_tips for accounting report
   credit_tips = tips
  
@@ -390,14 +418,14 @@ def do_the_math(payments)
           'cash_sales'          => cash_sales,
           'credit_card_sales'   => credit_card_sales,
           'check_sales'         => check_sales,
-          'gross sales'         => collected_money - taxes - tips + refunds,
-          'net_sales'           => collected_money - taxes - tips + refunds - discounts,
+          'gross_sales'         => collected_money - taxes - tips + refunds,
+          'net_sales'           => collected_money - taxes - tips + refunds + discounts,
           'net_total'           => net_money + refunds - returned_processing_fees,
-          'food_sales'          => collected_money - taxes - tips + refunds - discounts - gift_cards_sold, #-abc sales #refunds ? may not be food?
-        #  'abc_sales'           => fm() net_sales - food_sales - gift_cards_sold
-        #  'abc_split'           => fm() beer/wine, liquor
-
+          'food_sales'          => collected_money - taxes - tips + refunds - gift_cards_sold - beer_money - wine_money - liquor_money,
+          'abc_sales'           => abc_sales, 
           'discounts'           => discounts,
+          'food_discount'       => food_discount,
+          'alco_discount'       => alco_discount,
           'fees'                => processing_fees,
           'fees_returned'       => returned_processing_fees,
           'tax_collected'       => taxes,
@@ -410,23 +438,19 @@ def do_the_math(payments)
           'difference'          => difference
         }
     @shift_data.merge!(temp_hash)
-  
+ 
 end
 
 def cli_out #output data to the screen
+
   puts " "
   puts " "
   puts 'Date             ' + @shift_data['date'] + @shift_data['report_type']
   puts 'Transactions     ' + @shift_data['transactions'].to_s
-  puts 'Register Open    ' + @shift_data['register_start'].to_s
-  puts 'Register Close   ' + @shift_data['register_close'].to_s  
-  puts 'Difference       ' + @shift_data['difference'].to_s 
-
-  if @shift_data['report_type'] == "AM"
-    puts 'Tips             ' + @shift_data['shift_tips'].to_s 
-  else
-    puts 'Tips             ' + @shift_data['shift_tips'].to_s 
-  end
+  puts 'Register Open    ' + fm(@shift_data['register_start']) 
+  puts 'Register Close   ' + fm(@shift_data['register_close'])  
+  puts 'Difference       ' + fm(@shift_data['difference']) 
+  puts 'Tips             ' + fm(@shift_data['shift_tips']['total']) 
   puts " " 
 end
 
@@ -473,12 +497,12 @@ def to_pdf
       ])
     
     #Net Data
-    net_data = ([["Net Food Sales",fm(@shift_data['food_sales'])],
-                 ["Net ABC Sales", "soon "],
+    net_data = ([["Gross Food Sales",fm(@shift_data['food_sales'])],
+                 ["Gross ABC Sales", fm(@shift_data['abc_sales']['abc_total'])],
                  ["Gift Certificate Sold", fm(@shift_data['gift_cards_sold'])], #add array of ttl and each_value
-                 ["Discounts", fm(@shift_data['discounts'])],
+                 ["Discounts Food/Alcohol", fm(@shift_data['food_discount']) + " / " + fm(@shift_data['alco_discount'])],
                  ["Returns", fm(@shift_data['refunds'])],
-                 ["Net Sales", fm(@shift_data['net_sales'])],
+                 ["Total Sales", fm(@shift_data['gross_sales'])],
                  ["Tax on Sales", fm(@shift_data['tax_collected'])],
                  ["Transactions", @shift_data['transactions']]
       ]) 
@@ -503,15 +527,16 @@ def to_pdf
         tip << ["\u2022  " + name.capitalize, fm( @shift_data['lunch_tips']['each'])]
       end
     else
-        #tip << ["Dinner Tips        <font size='9'>(total - cash - credit)</font> ", @shift_data['lunch_tips'].to_s + " - " + @shift_data['lunch_cash_tips'].to_s + " - " + @shift_data['lunch_credit_tips'].to_s]
         @shift_data['server_names'].each do |name|
           tip << ["\u2022  " + name.capitalize,  fm(@shift_data['dinner_tips']['each'])]
         end
     end
-    
+ 
     #if register diff = 0 show the duck
-    if @shift_data['difference'] == 0
-      duck = "../assets/images/duckling3.png"
+    if @shift_data['difference'] == 0  && Date.today < Date.new(2017,2,1)
+      #duck = "../assets/images/duckling3.png"
+      #path for windows
+      duck = "c:/Users/citizen/Documents/citizen_reporting/assets/images/duckling3.png"
       pdf.image duck, :position => :right, :vposition => :top, :scale => 0.08
       pdf.move_up 40
     end
@@ -555,7 +580,8 @@ def to_pdf
       end 
 
   end
-
+  
+  #includes path relative to windows - change or comment out on mac/linux
   FileUtils.move  "#{@date}_#{@shift_data['report_type']}_report.pdf" , "c:/Users/citizen/Desktop/Reports/#{@date}_#{@shift_data['report_type']}_report.pdf"
 end
 
@@ -593,11 +619,11 @@ def accounting_math
   
   charge_deposit = @shift_data['credit_card_sales'] + @shift_data['credit_refunds'] + @shift_data['fees'] + @shift_data['fees_returned'] +  @shift_data['credit_tips']
 
-  temp_hash = { 'food_sales'              => @shift_data['food_sales'], #-abc sales
-                'abc_sales'               => " soon ",
+  temp_hash = { 'food_sales'              => @shift_data['food_sales'],  
+                'abc_sales'               => @shift_data['abc_sales']['abc_total'],
                 'gc_sold'                 => @shift_data['gift_cards_sold'],
                 'sales_tax'               => taxes,
-                'total'                   => @shift_data['food_sales'] + @shift_data['gift_cards_sold'] + taxes['total'], #+abc sales
+                'total'                   => @shift_data['food_sales'] + @shift_data['gift_cards_sold'] + taxes['total'] + @shift_data['abc_sales']['abc_total'],  
                 'cc_fees'                 => @shift_data['fees'] - @shift_data['fees_returned'],
                 'gift_certificate_sales'  => @shift_data['gift_card_sales'],
                 'charge_tip_payout'       => @shift_data['credit_tips'],
@@ -616,7 +642,7 @@ def accounting_pdf #report for accountant
    
 
     part1 = ([ [{:content =>  "Food Sales", :colspan => 2}, "600", fm(@accounting_data['food_sales']) ],
-               [{:content =>  "ABC Sales", :colspan => 2}, " ", " soon  "],
+               [{:content =>  "ABC Sales", :colspan => 2}, " ", fm(@accounting_data['abc_sales'])],
                [{:content =>  "Sales Tax", :colspan => 2},"442", fm(@accounting_data['sales_tax']['total'])],
                [{:content =>  "GC Sold", :colspan => 2}," ", fm(@accounting_data['gc_sold'])],
                [{:content =>  "Total", :colspan => 2}," ", fm(@accounting_data['total'])],
@@ -649,6 +675,7 @@ def accounting_pdf #report for accountant
  
   end
 
+  #includes path relative to windows - change or comment out on mac/linux
   FileUtils.move  "#{@date}_accounting.pdf" , "c:/Users/citizen/Desktop/Reports/#{@date}_accounting.pdf"
 end
 
