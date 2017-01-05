@@ -533,7 +533,7 @@ def to_pdf
     end
  
     #if register diff = 0 show the duck
-    if @shift_data['difference'] == 0  && Date.today < Date.new(2017,2,1)
+    if @shift_data['difference'] == 0  && Date.today > Date.new(2017,2,1)
       #duck = "../assets/images/duckling3.png"
       #path for windows
       duck = "c:/Users/citizen/Documents/reports/citizen_reporting/assets/images/duckling3.png"
