@@ -534,9 +534,7 @@ def to_pdf
  
     #if register diff = 0 show the duck
     if @shift_data['difference'] == 0  && Date.today > Date.new(2017,2,1)
-      #duck = "../assets/images/duckling3.png"
-      #path for windows
-      duck = "c:/Users/citizen/Documents/reports/citizen_reporting/assets/images/duckling3.png"
+      duck = "../assets/images/duckling3.png"
       pdf.image duck, :position => :right, :vposition => :top, :scale => 0.08
       pdf.move_up 40
     end
@@ -643,7 +641,9 @@ def accounting_pdf #report for accountant
 
     part1 = ([ [{:content =>  "Food Sales", :colspan => 2}, "600", fm(@accounting_data['food_sales']) ],
                [{:content =>  "ABC Sales", :colspan => 2}, " ", fm(@accounting_data['abc_sales'])],
+			   [{:content =>  "Retail Sales", :colspan => 2}, " ", " "],
                [{:content =>  "Sales Tax", :colspan => 2},"442", fm(@accounting_data['sales_tax']['total'])],
+			   [{:content =>  "Retail Tax", :colspan => 2}, " ", " "],
                [{:content =>  "GC Sold", :colspan => 2}," ", fm(@accounting_data['gc_sold'])],
                [{:content =>  "Total", :colspan => 2}," ", fm(@accounting_data['total'])],
                [{:content =>  " ", :colspan => 2}," "," "],    
