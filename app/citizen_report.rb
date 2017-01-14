@@ -688,7 +688,7 @@ def accounting_pdf #report for accountant
   end
 
   #includes path relative to windows - change or comment out on mac/linux
-  FileUtils.move  "#{@date}_accounting.pdf" , "%UserProfile%/desktop/Reports/#{@date}_accounting.pdf"
+  FileUtils.move  "#{@date}_accounting.pdf" , "../docs/pdf/#{@date}_accounting.pdf"
 end
 
 def cleanup #move generated files to google drive folder clear the terminal and return to the menu
