@@ -1,4 +1,4 @@
-require 'set'
+ require 'set'
 require 'unirest'
 require 'uri'
 require 'highline'
@@ -429,6 +429,7 @@ def do_the_math(payments)
           'fees'                => processing_fees,
           'fees_returned'       => returned_processing_fees,
           'tax_collected'       => taxes,
+          'city_tax'            => (collected_money -taxes - tips + refunds + discounts),
           'credit_tips'         => credit_tips,
           'shift_tips'          => shift_tips,
           'breakfast_tips'      => breakfast_tips, 
@@ -578,7 +579,7 @@ def to_pdf
       end 
 
   end
-  
+  print_hash
   #includes path relative to windows - change or comment out on mac/linux
   FileUtils.move  "#{@date}_#{@shift_data['report_type']}_report.pdf" , "c:/Users/citizen/Desktop/Reports/#{@date}_#{@shift_data['report_type']}_report.pdf"
 end
@@ -607,8 +608,8 @@ end
 
 def accounting_math 
   taxes = {}
-  taxes =  {"total" => @shift_data['tax_collected'], "city" => (@shift_data['tax_collected'] * 0.06 ) }
-  #tax_ary << ttl_tax * 6%
+  taxes =  {"total" => @shift_data['tax_collected'], "city" => (@shift_data['food_sales'] + @shift_data['abc_sales']['abc_total'] * 0.06 ) } #include retail sales when available  
+  
   total_dispursments = (@accounting_data['food_purchases'] +
                         @accounting_data['supplies'] +
                         @accounting_data['repairs'] +
@@ -619,8 +620,10 @@ def accounting_math
 
   temp_hash = { 'food_sales'              => @shift_data['food_sales'],  
                 'abc_sales'               => @shift_data['abc_sales']['abc_total'],
+                'retail_sales'            => "soon",
                 'gc_sold'                 => @shift_data['gift_cards_sold'],
-                'sales_tax'               => taxes,
+                'sales_tax'               => taxes, 
+                'retail_tax'              => "soon",
                 'total'                   => @shift_data['food_sales'] + @shift_data['gift_cards_sold'] + taxes['total'] + @shift_data['abc_sales']['abc_total'],  
                 'cc_fees'                 => @shift_data['fees'] - @shift_data['fees_returned'],
                 'gift_certificate_sales'  => @shift_data['gift_card_sales'],
