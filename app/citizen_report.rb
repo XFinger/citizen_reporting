@@ -591,7 +591,7 @@ def to_pdf
   end
 
   #includes path relative to windows - change or comment out on mac/linux
-  FileUtils.move  "#{@date}_#{@shift_data['report_type']}_report.pdf" , "%userprofile%/desktop/Reports/#{@date}_#{@shift_data['report_type']}_report.pdf"
+  FileUtils.move  "#{@date}_#{@shift_data['report_type']}_report.pdf" , "%UserProfile%/desktop/Reports/#{@date}_#{@shift_data['report_type']}_report.pdf"
 end
 
 def accounting_interview #get data for daily accounting sheet
@@ -688,7 +688,7 @@ def accounting_pdf #report for accountant
   end
 
   #includes path relative to windows - change or comment out on mac/linux
-  FileUtils.move  "#{@date}_accounting.pdf" , "%userprofile%/desktop/Reports/#{@date}_accounting.pdf"
+  FileUtils.move  "#{@date}_accounting.pdf" , "%UserProfile%/desktop/Reports/#{@date}_accounting.pdf"
 end
 
 def cleanup #move generated files to google drive folder clear the terminal and return to the menu
