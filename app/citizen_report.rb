@@ -13,17 +13,17 @@ require_relative '../config/configatron/defaults.rb'
 
 class MakeReport
 
-	ACCESS_TOKEN = configatron.access_token
-	# The base URL for every Connect API request
-	CONNECT_HOST = 'https://connect.squareup.com'
-	# Standard HTTP headers for every Connect API request
-	REQUEST_HEADERS = {
-	  'Authorization' => 'Bearer ' + ACCESS_TOKEN,
-	  'Accept' => 'application/json',
-	  'Content-Type' => 'application/json'
-	}
-	#unique id
-	LOCATION_ID = configatron.location_id
+  ACCESS_TOKEN = configatron.access_token
+  # The base URL for every Connect API request
+  CONNECT_HOST = 'https://connect.squareup.com'
+  # Standard HTTP headers for every Connect API request
+  REQUEST_HEADERS = {
+    'Authorization' => 'Bearer ' + ACCESS_TOKEN,
+    'Accept' => 'application/json',
+    'Content-Type' => 'application/json'
+  }
+  #unique id
+  LOCATION_ID = configatron.location_id
 
   Prawn::Font::AFM.hide_m17n_warning = true
 
@@ -37,32 +37,32 @@ end
 
 def menu #what type of report to run 
    @shift_data = {}
-	
-	 cli = HighLine.new
-		start_menu = [ "AM shift report",
-					         "PM shift report",
+  
+   cli = HighLine.new
+    start_menu = [ "AM shift report",
+                   "PM shift report",
                    "AM shift report with custom date",
                    "PM shift report with custom date",
-					         "Accountant report",
-		               "Accountant report with custom date",
+                   "Accountant report",
+                   "Accountant report with custom date",
                    "Quit" 
-				 	        ]
+                  ]
 
-		cli.choose do |menu|
-		  menu.prompt = 'Make your choice: '
-		  menu.choices(*start_menu) do |chosen|		
-			case chosen
-			    when "AM shift report"
-			      @begin_time = Date.today.to_s + @am_start
-					  @end_time = Date.today.to_s + @am_end 
-					  @date = Date.today 
-					  @report_type = 'AM'
+    cli.choose do |menu|
+      menu.prompt = 'Make your choice: '
+      menu.choices(*start_menu) do |chosen|   
+      case chosen
+          when "AM shift report"
+            @begin_time = Date.today.to_s + @am_start
+            @end_time = Date.today.to_s + @am_end 
+            @date = Date.today 
+            @report_type = 'AM'
 
-			    when "PM shift report"
-			    	@begin_time = Date.today.to_s + @pm_start
-					  @end_time = Date.today.to_s +  @pm_end
-					  @date = Date.today 
-					  @report_type = 'PM'
+          when "PM shift report"
+            @begin_time = Date.today.to_s + @pm_start
+            @end_time = Date.today.to_s +  @pm_end
+            @date = Date.today 
+            @report_type = 'PM'
 
           when "AM shift report with custom date"
             cli = HighLine.new
@@ -86,14 +86,14 @@ def menu #what type of report to run
             @date = custom_date 
             @report_type = 'PM'           
 
-			    when "Accountant report"
-			    	@begin_time = Date.today.to_s + @am_start
-					  @end_time = Date.today.to_s + @pm_end
-					  @date = Date.today 
-					  @report_type = 'Acc'
+          when "Accountant report"
+            @begin_time = Date.today.to_s + @am_start
+            @end_time = Date.today.to_s + @pm_end
+            @date = Date.today 
+            @report_type = 'Acc'
 
-			    when "Accountant report with custom date"
-			    	cli = HighLine.new
+          when "Accountant report with custom date"
+            cli = HighLine.new
             custom_date = cli.ask("Enter date? ", Date) {
             |q| q.default = Date.today.to_s;
                 q.validate = lambda { |p| Date.parse(p) <= Date.today };
@@ -101,17 +101,17 @@ def menu #what type of report to run
             @begin_time = custom_date.to_s + @am_start
             @end_time = custom_date.to_s + @pm_end
             @date = custom_date 
-					  @report_type = 'Acc'
+            @report_type = 'Acc'
           
           when "Quit"
             puts "Ok, see you."
             exit 0
 
-			   end
-		  end
-		end
+         end
+      end
+    end
 
-	@shift_data = {'date' => @date.strftime("%A %b %e %Y "), 'report_type' => @report_type}
+  @shift_data = {'date' => @date.strftime("%A %b %e %Y "), 'report_type' => @report_type}
    
   build_reports
  
@@ -169,16 +169,16 @@ def count_register #get total of register at end of shift. convert floats to int
 end
 
 def interview #get servers count & names, payouts, pay-ins ...              
-	bcount = count = servers_count = register_start = payouts = purchases = pay_ins = 
+  bcount = count = servers_count = register_start = payouts = purchases = pay_ins = 
   drops = cash_tips = cash_b_tips = credit_b_tips = b_servers_count = 0
-	
+  
   server_names = []
   b_server_names = []
-	temp_hash = {}
+  temp_hash = {}
 
-	cli = HighLine.new
-	cashier = cli.ask( "Cashier Name: ", String)
-	server_names << cashier
+  cli = HighLine.new
+  cashier = cli.ask( "Cashier Name: ", String)
+  server_names << cashier
 
   #get breakfast wait staff name, cc tips & cash tips
   if @shift_data['report_type'] == 'AM' 
@@ -194,22 +194,22 @@ def interview #get servers count & names, payouts, pay-ins ...
   end
 
   #get lunch/dinner data
-	servers_count = cli.ask( "Number of Servers (lunch/dinner don't include cashier): ", Integer)
-	servers_count.times do  
-		count += 1
-		server_names << cli.ask( "server # #{count} name: ", String)
-	end
+  servers_count = cli.ask( "Number of Servers (lunch/dinner don't include cashier): ", Integer)
+  servers_count.times do  
+    count += 1
+    server_names << cli.ask( "server # #{count} name: ", String)
+  end
 
   cash_tips        = cli.ask( "Cash Tips (lunch/dinner): ", Float)
-	register_start   = cli.ask( "Register Open: ", Float)
-	payouts          = cli.ask( "Payouts: ", Float)
-	purchases        = cli.ask( "Purchases: ", Float)
-	pay_ins          = cli.ask( "Pay Ins: ", Float)
-	drops            = cli.ask( "Drops: ", Float)
-	notes            = cli.ask( "Shift Notes (weather, holiday, special events ... ): ", String)
+  register_start   = cli.ask( "Register Open: ", Float)
+  payouts          = cli.ask( "Payouts: ", Float)
+  purchases        = cli.ask( "Purchases: ", Float)
+  pay_ins          = cli.ask( "Pay Ins: ", Float)
+  drops            = cli.ask( "Drops: ", Float)
+  notes            = cli.ask( "Shift Notes (weather, holiday, special events ... ): ", String)
 
-	#add responses to hash
-	temp_hash = { 'register_start'  =>  to_pennies(register_start),
+  #add responses to hash
+  temp_hash = { 'register_start'  =>  to_pennies(register_start),
                 'b_server_names'  =>  b_server_names, 
                 'cash_b_tips'     =>  to_pennies(cash_b_tips),
                 'credit_b_tips'   =>  to_pennies(credit_b_tips), 
@@ -221,7 +221,7 @@ def interview #get servers count & names, payouts, pay-ins ...
                 'pay_ins'         =>  to_pennies(pay_ins), 
                 'drops'           =>  to_pennies(drops), 
                 'notes'           =>  notes
-              }	
+              } 
   @shift_data.merge!(temp_hash)
 
 end
@@ -251,7 +251,7 @@ def poll_square
       if response.headers.has_key?(:link)
         pagination_header = response.headers[:link]
         if pagination_header.include? "rel='next'"
-        	 
+           
           # Extract the next batch URL from the header.
           #
           # Pagination headers have the following format:
@@ -276,7 +276,7 @@ def do_the_math(payments)
                     credit_card_sales = returned_processing_fees = net_money = refunds = gift_cards_sold = 
                     counter = cc_refund = cash_refund = transactions = register_close = cash_tips_collected =
                     total_tips = food_sales = credit_tips =  beer_money = wine_money = liquor_money = 
-                    alco_discount = food_discount = 0
+                    alco_discount = food_discount = retail_sales = retail_tax = 0
   gift_card = []
   temp_hash = {}
   shift_tips = {}
@@ -288,7 +288,7 @@ def do_the_math(payments)
   # Add values to each cumulative variable
   
   for payment in payments
-  	transactions    += 1
+    transactions    += 1
       collected_money = collected_money + payment['total_collected_money']['amount'] 
       taxes           = taxes           + payment['tax_money']['amount']
       tips            = tips            + payment['tip_money']['amount']
@@ -296,19 +296,19 @@ def do_the_math(payments)
       processing_fees = processing_fees + payment['processing_fee_money']['amount']
       net_money       = net_money       + payment['net_total_money']['amount']
       refunds         = refunds         + payment['refunded_money']['amount']
-   	
-   	#breakdown of payment types
+    
+    #breakdown of payment types
       transaction_type = payment['tender'][0]['name']
       case transaction_type
-   		   when "Cash"
-    			cash_sales 	= cash_sales + payment['tender'][0]['total_money']['amount'] 
-    		when "Credit Card"  
-    			credit_card_sales	= credit_card_sales + payment['tender'][0]['total_money']['amount']
-    		when "MERCHANT_GIFT_CARD"  
-    			gift_card_sales = gift_card_sales + payment['tender'][0]['total_money']['amount']
-    		when "CHECK"
-    			check_sales	= check_sales	+ payment['tender'][0]['total_money']['amount']
-    	end
+         when "Cash"
+          cash_sales  = cash_sales + payment['tender'][0]['total_money']['amount'] 
+        when "Credit Card"  
+          credit_card_sales = credit_card_sales + payment['tender'][0]['total_money']['amount']
+        when "MERCHANT_GIFT_CARD"  
+          gift_card_sales = gift_card_sales + payment['tender'][0]['total_money']['amount']
+        when "CHECK"
+          check_sales = check_sales + payment['tender'][0]['total_money']['amount']
+      end
    
     #get alcohol sales & discounts
      payment['itemizations'].each do |alco|
@@ -335,6 +335,14 @@ def do_the_math(payments)
     #split food/alcohol discounts (negative numbers)
     food_discount = discounts - alco_discount
 
+    #get retail sales and associated tax value
+    payment['itemizations'].each do |ret|
+      if ret['item_detail']['category_name'] == 'Retail'
+        retail_sales += ret['gross_sales_money']['amount']
+        retail_tax   += ret['gross_sales_money']['amount'] * 0.05300000
+      end
+    end    
+
 
     #get array of new gift card sales
     payment['itemizations'].each do |gc|
@@ -343,16 +351,16 @@ def do_the_math(payments)
         gift_cards_sold += gc['net_sales_money']['amount'] #total value of new gift cards
       end
     end
-  	 
-  	
-  	#get breakdown of refunded money type (cash/credit)
-  	 if  payment['tender'][0]['refunded_money']['amount'] < 0
-    		if payment['tender'][0]['type'] == 'CREDIT_CARD'
-    			cc_refund += payment['tender'][0]['refunded_money']['amount']
-    		else
-    			cash_refund += payment['tender'][0]['refunded_money']['amount']
-    		end
-   	end 
+     
+    
+    #get breakdown of refunded money type (cash/credit)
+     if  payment['tender'][0]['refunded_money']['amount'] < 0
+        if payment['tender'][0]['type'] == 'CREDIT_CARD'
+          cc_refund += payment['tender'][0]['refunded_money']['amount']
+        else
+          cash_refund += payment['tender'][0]['refunded_money']['amount']
+        end
+    end 
   
     #If a processing fee was applied to the payment AND some portion of the payment was refunded...
     if payment['processing_fee_money']['amount'] < 0 && payment['refunded_money']['amount'] < 0
@@ -421,8 +429,10 @@ def do_the_math(payments)
           'gross_sales'         => collected_money - taxes - tips + refunds,
           'net_sales'           => collected_money - taxes - tips + refunds + discounts,
           'net_total'           => net_money + refunds - returned_processing_fees,
-          'food_sales'          => collected_money - taxes - tips + refunds - gift_cards_sold - beer_money - wine_money - liquor_money,
-          'abc_sales'           => abc_sales, 
+          'food_sales'          => collected_money - taxes - tips + refunds - gift_cards_sold - beer_money - wine_money - liquor_money - retail_sales,
+          'abc_sales'           => abc_sales,
+          'retail_sales'        => retail_sales,
+          'retail_tax'          => retail_tax,
           'discounts'           => discounts,
           'food_discount'       => food_discount,
           'alco_discount'       => alco_discount,
@@ -439,7 +449,6 @@ def do_the_math(payments)
           'difference'          => difference
         }
     @shift_data.merge!(temp_hash)
- 
 end
 
 def cli_out #output data to the screen
@@ -500,6 +509,7 @@ def to_pdf
     #Net Data
     net_data = ([["Gross Food Sales",fm(@shift_data['food_sales'])],
                  ["Gross ABC Sales", fm(@shift_data['abc_sales']['abc_total'])],
+                 ["Gross Retail Sales", fm(@shift_data['retail_sales'])],
                  ["Gift Certificate Sold", fm(@shift_data['gift_cards_sold'])], #add array of ttl and each_value
                  ["Discounts Food/Alcohol", fm(@shift_data['food_discount']) + " / " + fm(@shift_data['alco_discount'])],
                  ["Returns", fm(@shift_data['refunds'])],
@@ -607,8 +617,7 @@ def accounting_interview #get data for daily accounting sheet
 end
 
 def accounting_math 
-  taxes = {}
-  taxes =  {"total" => @shift_data['tax_collected'], "city" => (@shift_data['food_sales'] + @shift_data['abc_sales']['abc_total'] * 0.06 ) } #include retail sales when available  
+
   
   total_dispursments = (@accounting_data['food_purchases'] +
                         @accounting_data['supplies'] +
@@ -617,14 +626,14 @@ def accounting_math
                         @accounting_data['office_supplies']) 
   
   charge_deposit = @shift_data['credit_card_sales'] + @shift_data['credit_refunds'] + @shift_data['fees'] + @shift_data['fees_returned'] +  @shift_data['credit_tips']
-
+  city_tax = (@shift_data['food_sales'] + @shift_data['abc_sales']['abc_total'] + @shift_data['retail_sales']) * 0.05300000
+  
   temp_hash = { 'food_sales'              => @shift_data['food_sales'],  
                 'abc_sales'               => @shift_data['abc_sales']['abc_total'],
                 'retail_sales'            => "soon",
                 'gc_sold'                 => @shift_data['gift_cards_sold'],
-                'sales_tax'               => taxes, 
-                'retail_tax'              => "soon",
-                'total'                   => @shift_data['food_sales'] + @shift_data['gift_cards_sold'] + taxes['total'] + @shift_data['abc_sales']['abc_total'],  
+                'city_tax'                => city_tax,
+                'total'                   => @shift_data['food_sales'] + @shift_data['gift_cards_sold'] + @shift_data['tax_collected'] + @shift_data['abc_sales']['abc_total'] + @shift_data['retail_sales'],  
                 'cc_fees'                 => @shift_data['fees'] - @shift_data['fees_returned'],
                 'gift_certificate_sales'  => @shift_data['gift_card_sales'],
                 'charge_tip_payout'       => @shift_data['credit_tips'],
@@ -642,11 +651,11 @@ def accounting_pdf #report for accountant
   Prawn::Document.generate("#{@date}_accounting.pdf" ) do |pdf|
    
 
-    part1 = ([ [{:content =>  "Food Sales", :colspan => 2}, "600", fm(@accounting_data['food_sales']) ],
+    part1 = ([ [{:content =>  "Food Sales", :colspan => 2}, "600", fm(@accounting_data['food_sales'])],
                [{:content =>  "ABC Sales", :colspan => 2}, " ", fm(@accounting_data['abc_sales'])],
-			   [{:content =>  "Retail Sales", :colspan => 2}, " ", " "],
-               [{:content =>  "Sales Tax", :colspan => 2},"442", fm(@accounting_data['sales_tax']['total'])],
-			   [{:content =>  "Retail Tax", :colspan => 2}, " ", " "],
+               [{:content =>  "Retail Sales", :colspan => 2}, " ", fm(@shift_data['retail_sales'])],
+               [{:content =>  "Sales Tax", :colspan => 2},"442", fm(@shift_data['tax_collected']) + "  /  " + fm(@accounting_data['city_tax'])],
+               [{:content =>  "Retail Tax", :colspan => 2}, " ", fm(@shift_data['retail_tax'])],
                [{:content =>  "GC Sold", :colspan => 2}," ", fm(@accounting_data['gc_sold'])],
                [{:content =>  "Total", :colspan => 2}," ", fm(@accounting_data['total'])],
                [{:content =>  " ", :colspan => 2}," "," "],    
@@ -710,11 +719,11 @@ end
 
 # Helper function to convert cent-based money amounts to dollars and cents
 def fm(money)
-	money_string = format("%.2f", (money.abs/100.to_f))
-	if money < 0
-	  money_string = '-' + money_string
-	end
-	return money_string
+  money_string = format("%.2f", (money.abs/100.to_f))
+  if money < 0
+    money_string = '-' + money_string
+  end
+  return money_string
 end
 
 end
