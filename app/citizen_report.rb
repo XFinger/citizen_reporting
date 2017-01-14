@@ -591,7 +591,7 @@ def to_pdf
   end
 
   #includes path relative to windows - change or comment out on mac/linux
-  FileUtils.move  "#{@date}_#{@shift_data['report_type']}_report.pdf" , "%UserProfile%/desktop/Reports/#{@date}_#{@shift_data['report_type']}_report.pdf"
+  FileUtils.move  "#{@date}_#{@shift_data['report_type']}_report.pdf" , "../docs/pdf/#{@date}_#{@shift_data['report_type']}_report.pdf"
 end
 
 def accounting_interview #get data for daily accounting sheet
