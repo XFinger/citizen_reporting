@@ -589,7 +589,7 @@ def to_pdf
       end 
 
   end
-  print_hash
+
   #includes path relative to windows - change or comment out on mac/linux
   FileUtils.move  "#{@date}_#{@shift_data['report_type']}_report.pdf" , "c:/Users/citizen/Desktop/Reports/#{@date}_#{@shift_data['report_type']}_report.pdf"
 end
