@@ -379,9 +379,10 @@ def do_the_math(payments)
   if @shift_data['report_type'] == 'AM' || @shift_data['report_type'] == 'PM'
 
       #register_count -payouts -purchases -drops +pay_ins +cash_refund +cash_sales -tips(credit payouts)  + gift_card_sales
-      register_close = (@shift_data['register_count'] - @shift_data['payouts'] - @shift_data['purchases'] - 
-                        @shift_data['drops'] + @shift_data['pay_ins'] + cash_refund + cash_sales - tips + 
-                        gift_card_sales )
+      register_close = (@shift_data['register_start'] + @shift_data['register_count'] - @shift_data['payouts'] - 
+                        @shift_data['purchases'] - @shift_data['drops'] + @shift_data['pay_ins'] + cash_refund + cash_sales - 
+                        tips + gift_card_sales )
+      
       difference = @shift_data['register_start'] - (register_close + tips - cash_sales + cash_refund - gift_card_sales)
   
 
@@ -430,7 +431,8 @@ def do_the_math(payments)
           'net_sales'           => collected_money - taxes - tips + refunds + discounts,
           'net_total'           => net_money + refunds - returned_processing_fees,
           'food_sales'          => collected_money - taxes - tips + refunds - gift_cards_sold - beer_money - wine_money - liquor_money - retail_sales,
-          'abc_sales'           => abc_sales,
+          'gross_food_sales'    => collected_money - taxes - tips + refunds - gift_cards_sold - beer_money - wine_money - liquor_money - retail_sales + food_discount,
+          'abc_sales'           => abc_sales, #this is net
           'retail_sales'        => retail_sales,
           'retail_tax'          => retail_tax,
           'discounts'           => discounts,
@@ -506,13 +508,13 @@ def to_pdf
       ])
     
     #Net Data
-    net_data = ([["Gross Food Sales",fm(@shift_data['food_sales'])],
+    net_data = ([["Gross Food Sales",fm(@shift_data['gross_food_sales'])],
                  ["Gross ABC Sales", fm(@shift_data['abc_sales']['abc_total'])],
                  ["Gross Retail Sales", fm(@shift_data['retail_sales'])],
                  ["Gift Certificate Sold", fm(@shift_data['gift_cards_sold'])], #add array of ttl and each_value
-                 ["Discounts Food/Alcohol", fm(@shift_data['food_discount']) + " / " + fm(@shift_data['alco_discount'])],
+                 ["Discounts Food / Alcohol", fm(@shift_data['food_discount']) + " / " + fm(@shift_data['alco_discount'])],
                  ["Returns", fm(@shift_data['refunds'])],
-                 ["Total Sales", fm(@shift_data['gross_sales'])],
+                 ["Total Sales", fm(@shift_data['net_sales'])],
                  ["Tax on Sales", fm(@shift_data['tax_collected'])],
                  ["Transactions", @shift_data['transactions']]
       ]) 
@@ -589,8 +591,8 @@ def to_pdf
 
   end
   
-  #includes path relative to windows - change or comment out on mac/linux
-  FileUtils.move  "#{@date}_#{@shift_data['report_type']}_report.pdf" , "c:/Users/citizen/Desktop/Reports/#{@date}_#{@shift_data['report_type']}_report.pdf"
+  #move file to docs/pdf folder
+  FileUtils.move  "#{@date}_#{@shift_data['report_type']}_report.pdf" , "../docs/pdf/#{@date}_#{@shift_data['report_type']}_report.pdf"
 end
 
 def accounting_interview #get data for daily accounting sheet
@@ -621,13 +623,17 @@ def accounting_math
                         @accounting_data['supplies'] +
                         @accounting_data['repairs'] +
                         @accounting_data['laundry'] +
-                        @accounting_data['office_supplies']) 
+                        @accounting_data['office_supplies'] +
+                        @shift_data['fees'].abs + 
+                        @shift_data['fees_returned'] +
+                        @shift_data['gift_card_sales'] +
+                        @shift_data['credit_tips']
+                      ) 
   
   charge_deposit = @shift_data['credit_card_sales'] + @shift_data['credit_refunds'] + @shift_data['fees'] + @shift_data['fees_returned'] +  @shift_data['credit_tips']
-  city_tax = (@shift_data['food_sales'] + @shift_data['abc_sales']['abc_total'] + @shift_data['retail_sales']) * 0.05300000
+  city_tax = (@shift_data['food_sales'] + @shift_data['abc_sales']['abc_total'] + @shift_data['retail_sales']) * 0.06000
   
-  temp_hash = { 'food_sales'              => @shift_data['food_sales'],  
-                'abc_sales'               => @shift_data['abc_sales']['abc_total'],
+  temp_hash = { 'abc_sales'               => @shift_data['abc_sales']['abc_total'],
                 'gc_sold'                 => @shift_data['gift_cards_sold'],
                 'city_tax'                => city_tax,
                 'total'                   => @shift_data['food_sales'] + @shift_data['gift_cards_sold'] + @shift_data['tax_collected'] + @shift_data['abc_sales']['abc_total'] + @shift_data['retail_sales'],  
@@ -648,8 +654,9 @@ def accounting_pdf #report for accountant
   Prawn::Document.generate("#{@date}_accounting.pdf" ) do |pdf|
    
 
-    part1 = ([ [{:content =>  "Food Sales", :colspan => 2}, "600", fm(@accounting_data['food_sales'])],
+    part1 = ([ [{:content =>  "Food Sales", :colspan => 2}, "600", fm(@shift_data['food_sales'])],
                [{:content =>  "ABC Sales", :colspan => 2}, " ", fm(@accounting_data['abc_sales'])],
+               [{:content =>  "Beer - Wine - Liquor", :colspan => 2}, " ", fm(@shift_data['abc_sales']['beer_money']) + ' - ' + fm(@shift_data['abc_sales']['wine_money']) + ' - ' + fm(@shift_data['abc_sales']['liquor_money'])],
                [{:content =>  "Retail Sales", :colspan => 2}, " ", fm(@shift_data['retail_sales'])],
                [{:content =>  "Sales Tax", :colspan => 2},"442", fm(@shift_data['tax_collected']) + "  /  " + fm(@accounting_data['city_tax'])],
                [{:content =>  "Retail Tax", :colspan => 2}, " ", fm(@shift_data['retail_tax'])],
@@ -668,7 +675,7 @@ def accounting_pdf #report for accountant
                [{:content =>  " ", :colspan => 2}," "," "], 
                [{:content =>  "Cash Deposit", :colspan => 2},"105",fm(@accounting_data['cash_deposit'])],
                [{:content =>  "Charge Deposit", :colspan => 2}, "106",fm(@accounting_data['charge_deposit'])],
-               [{:content =>  "Total Receipts", :colspan => 2},"",fm(@accounting_data['cash_deposit'] + @accounting_data['charge_deposit'])]
+               [{:content =>  "Total Receipts", :colspan => 2},"",fm(@accounting_data['total'])]
       ])
 
     pdf.text("Citizen", size: 16, style: :bold)
@@ -684,8 +691,8 @@ def accounting_pdf #report for accountant
  
   end
 
-  #includes path relative to windows - change or comment out on mac/linux
-  FileUtils.move  "#{@date}_accounting.pdf" , "c:/Users/citizen/Desktop/Reports/#{@date}_accounting.pdf"
+  #move file to docs/pdf folder
+  FileUtils.move  "#{@date}_accounting.pdf" , "../docs/pdf/#{@date}_accounting.pdf"
 end
 
 def cleanup #move generated files to google drive folder clear the terminal and return to the menu
@@ -718,7 +725,7 @@ end
 def fm(money)
   money_string = format("%.2f", (money.abs/100.to_f))
   if money < 0
-    money_string = '-' + money_string
+    money_string = '( ' + money_string + ' )'
   end
   return money_string
 end
