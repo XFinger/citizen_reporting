@@ -632,8 +632,9 @@ def accounting_math
                         @shift_data['gift_card_sales'] +
                         @shift_data['credit_tips']
                       ) 
-  
+  cash_dispursments = total_dispursments - @shift_data['fees'].abs + @shift_data['fees_returned'] - @shift_data['credit_tips']
   charge_deposit = @shift_data['credit_card_sales'] + @shift_data['credit_refunds'] + @shift_data['fees'] + @shift_data['fees_returned'] +  @shift_data['credit_tips']
+  cash_deposit = @shift_data['cash_sales'] - @shift_data['cash_refunds'] - cash_dispursments
   city_tax = (@shift_data['food_sales'] + @shift_data['abc_sales']['abc_total'] + @shift_data['retail_sales']) * 0.06000
   
   temp_hash = { 'abc_sales'               => @shift_data['abc_sales']['abc_total'],
@@ -644,7 +645,7 @@ def accounting_math
                 'gift_certificate_sales'  => @shift_data['gift_card_sales'],
                 'charge_tip_payout'       => @shift_data['credit_tips'],
                 'total_dispursements'     => total_dispursments,
-                'cash_deposit'            => @shift_data['cash_sales'] - @shift_data['cash_refunds'] - @shift_data['credit_tips'],
+                'cash_deposit'            => cash_deposit,
                 'charge_deposit'          => charge_deposit
 
               }
