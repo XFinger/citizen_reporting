@@ -379,12 +379,12 @@ def do_the_math(payments)
   if @shift_data['report_type'] == 'AM' || @shift_data['report_type'] == 'PM'
 
       #register_count -payouts -purchases -drops +pay_ins +cash_refund +cash_sales -tips(credit payouts)  + gift_card_sales
-      register_close = (@shift_data['register_start'] + @shift_data['register_count'] - @shift_data['payouts'] - 
+      register_close = (@shift_data['register_start'] - @shift_data['payouts'] - 
                         @shift_data['purchases'] - @shift_data['drops'] + @shift_data['pay_ins'] + cash_refund + cash_sales - 
                         tips + gift_card_sales )
       
-      difference = @shift_data['register_start'] - (register_close + tips - cash_sales + cash_refund - gift_card_sales)
-  
+      #difference = @shift_data['register_start'] - (register_close + tips - cash_sales + cash_refund - gift_card_sales)
+      difference = (@shift_data['register_count'] + gift_card_sales) - register_close
 
       # get tip data breakfast & lunch or dinner
       cash_tips_collected = @shift_data['cash_tips'] + @shift_data['cash_b_tips']
@@ -494,17 +494,18 @@ def to_pdf
     
     #Register Data
     reg_data = ([["Cashier", @shift_data['cashier']],
-                 ["Register Open", fm(@shift_data['register_start'])],
+                 ["Register Count Open", fm(@shift_data['register_start'])],
                  ["Cash Sales", fm(@shift_data['cash_sales'])],
-                 ["Gift Certificate Sales", fm(@shift_data['gift_card_sales'])],
+                 ["Gift Certificate Receipts", fm(@shift_data['gift_card_sales'])],
                  ["Check Sales", fm(@shift_data['check_sales'])],
                  ["Cash Returns", fm(@shift_data['cash_refunds'])],
                  ["Purchases", fm(@shift_data['purchases'])],
                  ["Payouts", fm(@shift_data['payouts'])],
                  ["Drops", fm(@shift_data['drops'])], 
                  ["Pay Ins", fm(@shift_data['pay_ins'])],
-                 ["Register Close", fm(@shift_data['register_close'])],
                  ["Credit Tip Payouts", fm(@shift_data['shift_tips']['credit'])],
+                 ["Register Count Close", fm(@shift_data['register_count'])],
+                 ["Register Close", fm(@shift_data['register_close'])],
                  ["Register Difference", fm(@shift_data['difference'])]
       ])
     
@@ -621,20 +622,21 @@ end
 
 def accounting_math 
 
-  
-  total_dispursments = (@accounting_data['food_purchases'] +
+  cash_dispursments =   @accounting_data['food_purchases'] +
                         @accounting_data['supplies'] +
                         @accounting_data['repairs'] +
                         @accounting_data['laundry'] +
                         @accounting_data['office_supplies'] +
-                        @shift_data['fees'].abs + 
-                        @shift_data['fees_returned'] +
-                        @shift_data['gift_card_sales'] +
-                        @shift_data['credit_tips']
-                      ) 
-  cash_dispursments = total_dispursments - @shift_data['fees'].abs + @shift_data['fees_returned'] - @shift_data['credit_tips']
-  charge_deposit = @shift_data['credit_card_sales'] + @shift_data['credit_refunds'] + @shift_data['fees'] + @shift_data['fees_returned'] +  @shift_data['credit_tips']
-  cash_deposit = @shift_data['cash_sales'] - @shift_data['cash_refunds'] - cash_dispursments
+                        @shift_data['gift_card_sales']
+
+  charge_dispursments = @shift_data['credit_refunds'] + @shift_data['fees'].abs + @shift_data['fees_returned'] + @shift_data['credit_tips']
+  
+  total_dispursments = cash_dispursments + charge_dispursments
+  
+  charge_deposit = @shift_data['credit_card_sales'] - charge_dispursments + @shift_data['credit_tips']
+  
+  cash_deposit = @shift_data['cash_sales'] - cash_dispursments - @shift_data['credit_tips']
+  
   city_tax = (@shift_data['food_sales'] + @shift_data['abc_sales']['abc_total'] + @shift_data['retail_sales']) * 0.06000
   
   temp_hash = { 'abc_sales'               => @shift_data['abc_sales']['abc_total'],

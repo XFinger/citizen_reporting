@@ -4,5 +4,6 @@
 #configatron environmental variables - keeps secrets secret
 
 
-configatron.access_token = 'your square access_token goes here'
-configatron.location_id = 'your square locationn_id goes here'
+configatron.access_token = 'sq0atp-ZXk9o2oDuSPSVjp-ZqPUKw'
+configatron.location_id = '8K6Z43W5S5ETW'
+
