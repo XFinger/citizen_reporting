@@ -27,7 +27,6 @@ def get_shift_events(shift_ids)
     events = CallSquare.new.events_api_call connect_string
     shift_events += events
   end
-  
 
   parse_events(shift_events)
 
@@ -36,12 +35,12 @@ end
 #parse events and get food_purchases, supplies, repairs, office_supplies, other totals
 #payouts description must include the words 'food', 'office', 'supplies', 'repairs' or 'special' to be included in payouts
 def parse_events(shift_events) 
-	 
+ 
   
   food_purchases = supplies = repairs = office_supplies = other = 0
   shift_events.each do |e|
     e['events'].each do |p|
-      if !p['description'].empty? && p['event_type'] != 'PAID_IN' && !p['description'].downcase.include?("tip")
+      if !p['description'].empty?  && !p['description'].downcase.include?("tip")
 
         #total up payouts - each category must include (food, office, supplies, repairs or special) in
         #the description to be included in cash payouts for the accounting report.
@@ -53,7 +52,7 @@ def parse_events(shift_events)
           office_supplies += p['event_money']['amount']
         when /supplies/
           supplies += p['event_money']['amount']
-        when /repairs/ 
+        when /repair/ 
           repairs += p['event_money']['amount']
         when /special/
           other += p['event_money']['amount']
@@ -62,7 +61,7 @@ def parse_events(shift_events)
       end
    end
  end
-
+ 
    temp_hash = {'food_purchases'  => food_purchases,
                 'office_supplies' => office_supplies,
                 'supplies'        => supplies,
@@ -71,7 +70,7 @@ def parse_events(shift_events)
               }
 
    @accounting_data.merge!(temp_hash) 
-
+ 
 end
 
 def poll_square
@@ -97,7 +96,7 @@ def do_the_math(payments)
                     cc_refund = cash_refund = food_sales = beer_money = wine_money = liquor_money = 
                     alco_discount = food_discount = retail_sales = retail_tax = cash_tax = credit_tax = 
                     cash_dispursments = charge_dispursments = total_receipts = cash_deposit = 
-                    charge_deposit = count = 0
+                    charge_deposit = count = gc_refund = 0
   
   gift_card = []
   temp_hash = {}
@@ -117,7 +116,7 @@ def do_the_math(payments)
       refunds         = refunds         + payment['refunded_money']['amount']
     
     #breakdown of payment types
-    
+     
     payment['tender'].each do |payment_type|
 
       case payment_type['name']
@@ -125,7 +124,7 @@ def do_the_math(payments)
           cash_sales  = cash_sales + payment_type['total_money']['amount']
         when "Credit Card"  
           credit_card_sales = credit_card_sales + payment_type['total_money']['amount']
-        when "MERCHANT_GIFT_CARD"  
+        when "MERCHANT_GIFT_CARD"  || "OTHER"
           gift_card_sales = gift_card_sales + payment_type['total_money']['amount']
         when "CHECK"
           check_sales = check_sales + payment_type['total_money']['amount']
@@ -177,15 +176,18 @@ def do_the_math(payments)
     end
      
     
-    #get breakdown of refunded money type (cash/credit)
+    #get breakdown of refunded money type (cash/credit/gc)
      if  payment['tender'][0]['refunded_money']['amount'] < 0
         if payment['tender'][0]['type'] == 'CREDIT_CARD'
           cc_refund += payment['tender'][0]['refunded_money']['amount']
-        else
+        elsif payment['tender'][0]['type'] == 'CASH'
           cash_refund += payment['tender'][0]['refunded_money']['amount']
+        elsif payment['tender'][0]['type'] == 'MERCHANT_GIFT_CARD' || payment['tender'][0]['type'] == 'OTHER'
+          gc_refund += payment['tender'][0]['refunded_money']['amount']
+
         end
     end 
-  
+
     #If a processing fee was applied to the payment AND some portion of the payment was refunded...
     if payment['processing_fee_money']['amount'] < 0 && payment['refunded_money']['amount'] < 0
         # ...calculate the percentage of the payment that was refunded...
@@ -203,21 +205,20 @@ def do_the_math(payments)
                           @accounting_data['office_supplies'].abs  +
                           @accounting_data['repairs'].abs  +
                           @accounting_data['other'].abs  +
-                          gift_card_sales + tips)
+                          gift_card_sales - gc_refund.abs + tips)
 
   charge_dispursments = cc_refund + returned_processing_fees + processing_fees.abs
  
-  total_dispursments = cash_dispursments  + charge_dispursments - tips
+  total_dispursments = cash_dispursments + charge_dispursments - tips
   
   charge_deposit = credit_card_sales - charge_dispursments 
   
-  cash_deposit = cash_sales + check_sales - cash_dispursments + cash_refund
+  cash_deposit = cash_sales + check_sales + gift_card_sales - cash_dispursments + cash_refund 
   
   city_tax = food_sales + abc_total + retail_sales 
 
   total_receipts = charge_deposit + cash_deposit + total_dispursments
  
-
    #add responses to hash
   temp_hash = { 'food_sales'              => food_sales,
                 'abc_sales'               => abc_sales,
@@ -228,7 +229,7 @@ def do_the_math(payments)
                 'retail_tax'              => retail_tax,
                 'gift_cards_sold'         => gift_cards_sold, #value of new cards sold
                 'cc_fees'                 =>  processing_fees - returned_processing_fees,
-                'gift_card_sales'         =>  gift_card_sales, #value of card sales
+                'gift_card_sales'         =>  gift_card_sales + gc_refund, #value of card sales
                 'charge_tip_payout'       =>  tips,
                 'total_dispursements'     => total_dispursments,
                 'cash_deposit'            => cash_deposit,
