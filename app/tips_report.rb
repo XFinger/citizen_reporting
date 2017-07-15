@@ -1,10 +1,11 @@
 #Tips_report
 
 def interview #get servers count & names, tips             
-   count = cash_tips = cash_b_tips = credit_b_tips = b_servers_count = bcount= 0
+   count = cash_tips = cash_b_tips = credit_b_tips = b_servers_count = bcount ho_servers_count = hocount = hocash = hocredit = 0
   
   server_names = []
   b_server_names = []
+  ho_server_names = []
   temp_hash = {}
 
   cli = HighLine.new
@@ -25,6 +26,17 @@ def interview #get servers count & names, tips
   end
 
   #get lunch/dinner data
+  ho_servers_count = cli.ask("Number of Happy Hour Servers: ", Integer)
+    if ho_servers_count > 0
+       ho_servers_count.times do
+       hocount += 1
+       ho_server_names << cli.ask( "Happy Hour Server # #{hocount} name: ", String)
+    end
+  end
+
+  hocash   = cli.ask("Happy Hour Cash Tips: ", Float)
+  hocredit = cli.ask("Happy Hour Credit Tips: ", Float)
+
   servers_count = cli.ask( "Number of Servers (lunch/dinner don't include cashier): ", Integer)
   servers_count.times do  
     count += 1
@@ -34,7 +46,10 @@ def interview #get servers count & names, tips
   cash_tips        = cli.ask( "Cash Tips (lunch/dinner): ", Float)
 
   #add responses to hash
-  temp_hash = { 'b_server_names'  =>  b_server_names, 
+  temp_hash = { 'ho_server_names' => ho_server_names,
+                'hocash'          => to_pennies(hocash),
+                'hocredit'        => to_pennies(hocredit),
+                'b_server_names'  =>  b_server_names, 
                 'cash_b_tips'     =>  to_pennies(cash_b_tips),
                 'credit_b_tips'   =>  to_pennies(credit_b_tips), 
                 'cashier'         =>  cashier.capitalize, 
@@ -140,6 +155,22 @@ def cli_out #output data to the screen
 
 end
 
+def looking_good # based on cli_out info, continue to create pdf or restart the interview
+    cli = HighLine.new
+    start_menu = [ "Looks Good, create the pdf",
+                   "Something isn't right, restart" 
+                  ]
+    puts "  "
+    cli.choose do |menu|
+      menu.prompt = 'Make your choice: '
+      menu.choices(*start_menu) do |chosen|   
+        if chosen == "Something isn't right, restart" 
+          system "clear" #clear the terminal
+          menu #go back to main menu
+        end
+      end
+    end
+end
 
 def to_pdf
  

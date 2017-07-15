@@ -14,6 +14,8 @@ require_relative 'call_square.rb'
 require_relative 'accounting_report.rb'
 require_relative 'tips_report.rb'
 require_relative 'helpers.rb'
+require_relative 'settlements.rb'
+require_relative 'empty_report.rb'
 
 class MakeReport
   include Helper
@@ -155,39 +157,47 @@ def build_reports
     to_pdf
     cleanup #+ return to menu
   elsif @accounting_data['report_type'] == 'Acc'
-    #poll_square
-    get_shift_ids
-    poll_square
-    do_the_math(@payments) 
-    accounting_pdf
-    cleanup #+ return to menu
+    route_reports
+
   else #help
     menu
   end
 
 end
 
+def route_reports #decide what reports to run based on availability of data
+  @pdf_switch = false
+  get_shift_ids #returns @shift_ids
+  get_settlement_ids #returns @settlement_ids
+  
+  if @shift_ids.empty? && @settlement_ids.empty?
+    blank_pdf #print pdf placeholder
+    cleanup #+ return to menu
+  elsif @shift_ids.size > 0 && @settlement_ids.empty? 
+    #just get shift events
+    get_shift_events(@shift_ids)
+    poll_square
+    do_the_math(@payments)
+    accounting_pdf
+    cleanup #+ return to menu
+  elsif @shift_ids.empty? && @settlement_ids.size > 0
+    #just get settlements
+    parse_settelments(@settlement_ids)   
+    settlements_pdf
+    cleanup #+ return to menu
+  else
+    #get both settlements and shift events
+    @pdf_switch = true #toggle reporting pdf to add shift events
+    parse_settelments(@settlement_ids)   
+    get_shift_events(@shift_ids)
+    poll_square
+    do_the_math(@payments)
+    accounting_pdf 
+    cleanup #+ return to menu
+  end
+  
 
-
-def looking_good # based on cli_out info, continue to create pdf or restart the interview
-    cli = HighLine.new
-    start_menu = [ "Looks Good, create the pdf",
-                   "Something isn't right, restart" 
-                  ]
-    puts "  "
-    cli.choose do |menu|
-      menu.prompt = 'Make your choice: '
-      menu.choices(*start_menu) do |chosen|   
-        if chosen == "Something isn't right, restart" 
-          system "clear" #clear the terminal
-          menu #go back to main menu
-        end
-      end
-    end
 end
-
-
-
 
 
 end

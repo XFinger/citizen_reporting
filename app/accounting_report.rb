@@ -1,7 +1,7 @@
 #accounting_report
 
 def get_shift_ids  
-  shift_ids = []
+  @shift_ids = []
 
   #URL-encode all parameters
   parameters = URI.encode_www_form(
@@ -13,10 +13,11 @@ def get_shift_ids
   ids = CallSquare.new.api_call connect_string
  
   ids.each do |ids|
-    shift_ids  << ids['id']
+    @shift_ids  << ids['id']
   end
- 
-  get_shift_events(shift_ids)
+
+  return @shift_ids
+
 end
 
 def get_shift_events(shift_ids)
@@ -27,6 +28,7 @@ def get_shift_events(shift_ids)
     events = CallSquare.new.events_api_call connect_string
     shift_events += events
   end
+
 
   parse_events(shift_events)
 
@@ -84,18 +86,16 @@ def poll_square
 
     connect_string = '/payments?' + parameters
     @payments = CallSquare.new.api_call connect_string
-    #puts @payments.to_json
-
+  
 end
 
 def do_the_math(payments)
-  
   # Variables - set all to zero
   collected_money = taxes = tips = discounts = returned_processing_fees = processing_fees = cash_sales = 
                     gift_card_sales = check_sales = credit_card_sales = net_money = refunds = gift_cards_sold = 
                     cc_refund = cash_refund = food_sales = beer_money = wine_money = liquor_money = 
                     alco_discount = food_discount = retail_sales = retail_tax = cash_tax = credit_tax = 
-                    cash_dispursments = charge_dispursments = total_receipts = cash_deposit = 
+                    cash_disbursements = charge_disbursements = total_receipts = cash_deposit = 
                     charge_deposit = count = gc_refund = 0
   
   gift_card = []
@@ -199,25 +199,25 @@ def do_the_math(payments)
 
   food_sales = collected_money - taxes - tips  - gift_cards_sold - abc_total - retail_sales #+refunds
 
-#dispursment math
-  cash_dispursments =   (@accounting_data['food_purchases'].abs  +
+#disbursement math
+  cash_disbursements =   (@accounting_data['food_purchases'].abs  +
                           @accounting_data['supplies'].abs  +
                           @accounting_data['office_supplies'].abs  +
                           @accounting_data['repairs'].abs  +
                           @accounting_data['other'].abs  +
                           gift_card_sales - gc_refund.abs + tips)
 
-  charge_dispursments = cc_refund + returned_processing_fees + processing_fees.abs
+  charge_disbursements = cc_refund + returned_processing_fees + processing_fees.abs
  
-  total_dispursments = cash_dispursments + charge_dispursments - tips
+  total_disbursements = cash_disbursements + charge_disbursements - tips
   
-  charge_deposit = credit_card_sales - charge_dispursments 
+  charge_deposit = credit_card_sales - charge_disbursements 
   
-  cash_deposit = cash_sales + check_sales + gift_card_sales - cash_dispursments + cash_refund 
+  cash_deposit = cash_sales + check_sales + gift_card_sales - cash_disbursements + cash_refund 
   
   city_tax = food_sales + abc_total + retail_sales 
 
-  total_receipts = charge_deposit + cash_deposit + total_dispursments
+  total_receipts = charge_deposit + cash_deposit + total_disbursements
  
    #add responses to hash
   temp_hash = { 'food_sales'              => food_sales,
@@ -231,7 +231,7 @@ def do_the_math(payments)
                 'cc_fees'                 =>  processing_fees - returned_processing_fees,
                 'gift_card_sales'         =>  gift_card_sales + gc_refund, #value of card sales
                 'charge_tip_payout'       =>  tips,
-                'total_dispursements'     => total_dispursments,
+                'total_disbursements'     => total_disbursements,
                 'cash_deposit'            => cash_deposit,
                 'charge_deposit'          => charge_deposit,
                 'total_receipts'          => total_receipts
@@ -243,8 +243,7 @@ end
 
 def accounting_pdf #report for accountant
   Prawn::Document.generate("#{@accounting_data['date'].strftime("%m-%d-%Y")}_accounting.pdf" ) do |pdf|
-   
-
+     
     part1 = ([ [{:content =>  "Food Sales", :colspan => 2}, "600", fm(@accounting_data['food_sales'])],
                [{:content =>  "ABC Sales", :colspan => 2}, " ", fm(@accounting_data['abc_sales']['abc_total'])],
                [{:content =>  "Beer - Wine - Liquor", :colspan => 2}, " ", fm(@accounting_data['abc_sales']['beer_money']) + ' - ' + fm(@accounting_data['abc_sales']['wine_money']) + ' - ' + fm(@accounting_data['abc_sales']['liquor_money'])],
@@ -261,26 +260,44 @@ def accounting_pdf #report for accountant
                [{:content =>  "Special", :colspan => 2}," ", fm(@accounting_data['other'])],
                [{:content =>  "Credit Card Fee", :colspan => 2}, " ", fm(@accounting_data['cc_fees'])],
                [{:content =>  "GC Redeemed", :colspan => 2},"", fm(@accounting_data['gift_card_sales'])],
-               [{:content =>  "Total Disbursements", :colspan => 2},"", fm(@accounting_data['total_dispursements'])],
+               [{:content =>  "Total Disbursements", :colspan => 2},"", fm(@accounting_data['total_disbursements'])],
                [{:content =>  "Charge Tip Payout", :colspan => 2},"", fm(@accounting_data['charge_tip_payout'])],
                [{:content =>  " ", :colspan => 2}," "," "], 
                [{:content =>  "Cash Deposit", :colspan => 2},"105", fm(@accounting_data['cash_deposit'])],
-               [{:content =>  "Charge Deposit", :colspan => 2}, "106", fm(@accounting_data['charge_deposit'])],
-               [{:content =>  "Total Receipts", :colspan => 2},"", fm(@accounting_data['total_receipts'])]
+               [{:content =>  "Charge Balance", :colspan => 2}, "106", fm(@accounting_data['charge_deposit'])],
+               [{:content =>  "Total Receipts", :colspan => 2},"", fm(@accounting_data['total_receipts'])],
+               [{:content =>  " ", :colspan => 2}," "," "]              
       ])
 
-    pdf.text("Citizen", size: 16, style: :bold)
-    pdf.text(@accounting_data['date'].strftime("%m-%d-%Y"), size: 16, style: :bold)
-    pdf.move_down 20
-    pdf.table(part1, :width => 500, :cell_style =>
-     { :border_width => [0,0], size: 15, style: :bold}) do
+    pdf.text("Citizen " + @accounting_data['date'].strftime("%m-%d-%Y"), size: 12, style: :bold)
+    #pdf.move_down 5
+    pdf.table(part1, :width => 500, :cell_style => { :border_width => [0,0], :size => 12, :height => 22,  font_style: :bold}) do
         column(0).align = :left
         column(1).align = :left
         column(2).align = :left  
         column(3).align = :right
-      end
- 
-  end
+    end
+   
+    if @pdf_switch == true
+        settlement_data = []   
+        @settlement_arry.each do |set|     
+            settlement_data << [{:content => "Initiated On: " +  Date.parse(set['initiated_at']).to_s, :colspan => 4}] 
+            settlement_data << [{:content =>  "Deposit", :colspan => 2}, "106", fm(set['deposit'])] 
+            settlement_data << [{:content =>  "Capital", :colspan => 2}, " ", fm(set['capital'])] 
+            settlement_data << [{:content =>  "Instant Deposit Fee ", :colspan => 2},"", fm(set['instant_dep_fee'])]
+        end
+
+        pdf.table(settlement_data, :width => 500, :cell_style => { :border_width => [0,0], size: 12, font_style: :bold}) do
+            column(0).align = :left
+            column(1).align = :left
+            column(2).align = :left  
+            column(3).align = :right
+        end
+  
+    end
+  end  
+
+
 
   #move file to docs/pdf folder
   FileUtils.move  "#{@accounting_data['date'].strftime("%m-%d-%Y")}_accounting.pdf" , "../docs/pdf/#{@accounting_data['date'].strftime("%m-%d-%Y")}_accounting.pdf"
