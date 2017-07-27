@@ -54,6 +54,7 @@ def menu #what type of report to run & set variables accordingly
                    "PM tips report with custom date",
                    "Accountant report",
                    "Accountant report with custom date",
+                   "Accountant report with date range",
                    "Help",
                    "Quit" 
                   ]
@@ -108,6 +109,20 @@ def menu #what type of report to run & set variables accordingly
             @end_time = custom_date.to_s + @pm_end
             @accounting_data = {'date' => custom_date, 'report_type' => 'Acc'}
 
+          when "Accountant report with date range"
+            cli = HighLine.new
+            custom_date_start = cli.ask("Enter start date? ", Date) {
+            |q| q.default = Date.today.to_s;
+                q.validate = lambda { |p| Date.parse(p) <= Date.today };
+                q.responses[:not_valid] = "Enter a valid date less than or equal to today"}
+            custom_date_end = cli.ask("Enter end date? ", Date) {
+            |q| q.default = Date.today.to_s;
+                q.validate = lambda { |p| Date.parse(p) <= Date.today };
+                q.responses[:not_valid] = "Enter a valid date less than or equal to today"} 
+            @custom_date_start = custom_date_start
+            @custom_date_end = custom_date_end
+            @accounting_data = {'report_type' => 'batch'}                
+
           when "Help"
             puts "  "
             puts "AM tips report / AM tips report with custom date: "
@@ -133,6 +148,8 @@ def menu #what type of report to run & set variables accordingly
             puts "Accountant reports get payout info from Square. For payouts to be included in the report, include "
             puts "'food', 'office', 'supplies', 'repairs' or 'special', respectivly in the description field when doing payouts "
             puts "  "
+            puts "Accountant report with date range"
+            puts "Use date format (YYYY-mm-dd) for both start date and end date"
             puts "  "
           when "Quit"
             puts "Ok, see you."
@@ -147,8 +164,7 @@ def menu #what type of report to run & set variables accordingly
 end
 
 def build_reports
-  if @tip_data['report_type'] == 'AM' || @tip_data['report_type'] == 'PM'
-    
+  if @tip_data['report_type'] == 'AM' || @tip_data['report_type'] == 'PM'    
     interview
     square_tips
     split_tips(@tips)
@@ -158,11 +174,26 @@ def build_reports
     cleanup #+ return to menu
   elsif @accounting_data['report_type'] == 'Acc'
     route_reports
-
+    cleanup #+ return to menu
+  elsif @accounting_data['report_type'] == 'batch'
+    batch_reports
+    cleanup #+ return to menu
   else #help
     menu
   end
 
+end
+
+def batch_reports
+  (@custom_date_start..@custom_date_end).each do |b|
+    @accounting_data = {} #reset hash for each date
+    @begin_time = b.to_s + @am_start 
+    @end_time = b.to_s + @pm_end      
+    @accounting_data = {'date' => b, 'report_type' => 'Acc'} 
+    route_reports
+    puts b.to_s + " pdf complete."
+  end 
+  
 end
 
 def route_reports #decide what reports to run based on availability of data
@@ -172,19 +203,16 @@ def route_reports #decide what reports to run based on availability of data
   
   if @shift_ids.empty? && @settlement_ids.empty?
     blank_pdf #print pdf placeholder
-    cleanup #+ return to menu
   elsif @shift_ids.size > 0 && @settlement_ids.empty? 
     #just get shift events
     get_shift_events(@shift_ids)
     poll_square
     do_the_math(@payments)
     accounting_pdf
-    cleanup #+ return to menu
   elsif @shift_ids.empty? && @settlement_ids.size > 0
     #just get settlements
     parse_settelments(@settlement_ids)   
     settlements_pdf
-    cleanup #+ return to menu
   else
     #get both settlements and shift events
     @pdf_switch = true #toggle reporting pdf to add shift events
@@ -193,9 +221,9 @@ def route_reports #decide what reports to run based on availability of data
     poll_square
     do_the_math(@payments)
     accounting_pdf 
-    cleanup #+ return to menu
   end
   
+  #cleanup #+ return to menu
 
 end
 

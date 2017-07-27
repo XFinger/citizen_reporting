@@ -1,7 +1,7 @@
 #Tips_report
 
 def interview #get servers count & names, tips             
-   count = cash_tips = cash_b_tips = credit_b_tips = b_servers_count = bcount ho_servers_count = hocount = hocash = hocredit = 0
+   count = cash_tips = cash_b_tips = credit_b_tips = b_servers_count = bcount = ho_servers_count = hocount = hocash = hocredit = 0
   
   server_names = []
   b_server_names = []
@@ -23,28 +23,35 @@ def interview #get servers count & names, tips
         cash_b_tips   = cli.ask("Cash Tips (Breakfast Shift): ", Float)
         credit_b_tips = cli.ask("Credit Tips (Breakfash Shift): ", Float)
     end
-  end
-
-  #get lunch/dinner data
-  ho_servers_count = cli.ask("Number of Happy Hour Servers: ", Integer)
-    if ho_servers_count > 0
-       ho_servers_count.times do
-       hocount += 1
-       ho_server_names << cli.ask( "Happy Hour Server # #{hocount} name: ", String)
+    servers_count = cli.ask( "Number of Lunch Servers (don't include cashier): ", Integer)
+    servers_count.times do  
+      count += 1
+      server_names << cli.ask( "server # #{count} name: ", String)
     end
-  end
+    cash_tips        = cli.ask( "Cash Tips (lunch): ", Float)
 
-  hocash   = cli.ask("Happy Hour Cash Tips: ", Float)
-  hocredit = cli.ask("Happy Hour Credit Tips: ", Float)
 
-  servers_count = cli.ask( "Number of Servers (lunch/dinner don't include cashier): ", Integer)
-  servers_count.times do  
-    count += 1
-    server_names << cli.ask( "server # #{count} name: ", String)
-  end
+  elsif @tip_data['report_type'] == 'PM'
+  #get dinner data
+    ho_servers_count = cli.ask("Number of Happy Hour Servers: ", Integer)
+    if ho_servers_count > 0
+      ho_servers_count.times do
+          hocount += 1
+          ho_server_names << cli.ask( "Happy Hour Server # #{hocount} name: ", String)
+      end
+      hocash   = cli.ask("Happy Hour Cash Tips: ", Float)
+      hocredit = cli.ask("Happy Hour Credit Tips: ", Float)
+    end
+    servers_count = cli.ask( "Number of Dinner Servers (don't include cashier): ", Integer)
+    servers_count.times do  
+      count += 1
+      server_names << cli.ask( "server # #{count} name: ", String)
+    end
+    cash_tips        = cli.ask( "Cash Tips (dinner): ", Float)
 
-  cash_tips        = cli.ask( "Cash Tips (lunch/dinner): ", Float)
+end
 
+  
   #add responses to hash
   temp_hash = { 'ho_server_names' => ho_server_names,
                 'hocash'          => to_pennies(hocash),
@@ -77,18 +84,19 @@ end
 def split_tips(payments)
  
   # Variables - set all to zero
-  cash_tips_collected = total_tips = credit_tips = tips = 0
+  cash_tips_collected = total_tips = credit_tips = tips = hocredit = hocash = 0
   shift_tips = {}
   breakfast_tips = {}
   lunch_tips = {}
   dinner_tips = {}
+  ho_tips ={}
 
   for payment in payments
      tips = tips + payment['tip_money']['amount']
   end
   
   # get tip data breakfast & lunch or dinner
-  cash_tips_collected = @tip_data['cash_tips'] + @tip_data['cash_b_tips']
+  cash_tips_collected = @tip_data['cash_tips'] + @tip_data['cash_b_tips'] + @tip_data['hocash']
   total_tips =  cash_tips_collected + tips
     
   #tip hash - total, breakfast, lunch, dinner  => total, cash, credit
@@ -107,13 +115,22 @@ def split_tips(payments)
     end
 
       lunch_tips      = { 'total'   => total_tips - (@tip_data['cash_b_tips'] + @tip_data['credit_b_tips']), 
-                          'cash'    => cash_tips_collected - @tip_data['cash_b_tips'], 
+                          'cash'    => @tip_data['cash_tips'], 
                           'credit'  => tips - @tip_data['credit_b_tips'],
                           'each'    => (total_tips - (@tip_data['cash_b_tips'] + @tip_data['credit_b_tips']))/@tip_data['server_names'].size }
-    else
+  else
+    if (@tip_data['hocash'] + @tip_data['hocredit']) > 0 && @tip_data['ho_server_names'].size > 0
+      ho_tips         = { 'total'   => @tip_data['hocash'] + @tip_data['hocredit'],  
+                          'cash'    => @tip_data['hocash'], 
+                          'credit'  => @tip_data['hocredit'],    
+                          'each'    => (@tip_data['hocash'] + @tip_data['hocredit'])/@tip_data['ho_server_names'].size }
+    end 
       
-      dinner_tips     = { 'each'    => total_tips/@tip_data['server_names'].size }
-    end
+      dinner_tips     = { 'total'   => total_tips - (@tip_data['hocash'] + @tip_data['hocredit']), 
+                          'cash'    => cash_tips_collected - @tip_data['hocash'], 
+                          'credit'  => tips - @tip_data['hocredit'],
+                          'each'    => (total_tips - (@tip_data['hocash'] + @tip_data['hocredit']))/@tip_data['server_names'].size }
+  end
   
 
   #add responses to hash
@@ -122,8 +139,9 @@ def split_tips(payments)
           'shift_tips'          => shift_tips,
           'breakfast_tips'      => breakfast_tips, 
           'lunch_tips'          => lunch_tips,
-          'dinner_tips'         => dinner_tips,         
-                  }
+          'ho_tips'             => ho_tips,
+          'dinner_tips'         => dinner_tips         
+              }
 
     @tip_data.merge!(temp_hash)
 end
@@ -147,9 +165,18 @@ def cli_out #output data to the screen
         puts name.capitalize +  "    " + fm( @tip_data['lunch_tips']['each']).to_s 
       end
   else
-        @tip_data['server_names'].each do |name|
-        puts name.capitalize + "    " + fm(@tip_data['dinner_tips']['each']).to_s 
+      if !@tip_data['ho_tips'].empty? #avoid edge case with division by 0
+        puts "Happy Hour Tips  " + fm(@tip_data['ho_tips']['total']).to_s 
+        @tip_data['ho_server_names'].each do |bname|
+          puts bname.capitalize + "    " + fm(@tip_data['ho_tips']['each']).to_s
+        end
       end
+
+      puts "Dinner Tips  " + fm(@tip_data['dinner_tips']['total']).to_s 
+      @tip_data['server_names'].each do |name|
+        puts name.capitalize +  "    " + fm( @tip_data['dinner_tips']['each']).to_s 
+      end
+
   end
   puts " " 
 
@@ -198,9 +225,18 @@ def to_pdf
         tip << ["\u2022  " + name.capitalize, fm( @tip_data['lunch_tips']['each'])]
       end
     else
-        @tip_data['server_names'].each do |name|
-          tip << ["\u2022  " + name.capitalize,  fm(@tip_data['dinner_tips']['each'])]
+      if !@tip_data['ho_tips'].empty? #avoid edge case with division by 0
+        tip <<  ["Happy Hour Tips ", fm(@tip_data['ho_tips']['total']).to_s + " - " + fm(@tip_data['ho_tips']['cash']).to_s + " - " + fm(@tip_data['ho_tips']['credit']).to_s ] 
+        @tip_data['ho_server_names'].each do |bname|
+          tip << ["\u2022  " + bname.capitalize, fm(@tip_data['ho_tips']['each'])]
         end
+      end
+
+      tip << ["Dinner Tips ", fm(@tip_data['dinner_tips']['total']).to_s + " - " + fm(@tip_data['dinner_tips']['cash']).to_s + " - " + fm(@tip_data['dinner_tips']['credit']).to_s ]
+      @tip_data['server_names'].each do |name|
+        tip << ["\u2022  " + name.capitalize, fm( @tip_data['dinner_tips']['each'])]
+      end
+
     end
     
     pdf.text("Citizen Tip Data", size: 15, style: :bold)
