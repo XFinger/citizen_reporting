@@ -49,7 +49,6 @@ request_path = CONNECT_HOST + '/v1/' + LOCATION_ID + connect_string
         more_results = false
       end
   end 
- 
  return  data
 end
 

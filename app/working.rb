@@ -24,7 +24,7 @@ def accounting_pdf #report for accountant
                [{:content =>  "Credit Card Fee", :colspan => 2}, " ", fm(@accounting_data['cc_fees'])],
                [{:content =>  "GC Redeemed", :colspan => 2},"",fm(@accounting_data['gift_certificate_sales'])],
                [{:content =>  "Charge Tip Payout", :colspan => 2},"",fm(@shift_data['credit_tips'])],
-               [{:content =>  "Total Disbursements", :colspan => 2},"",fm(@accounting_data['total_dispursements'])],
+               [{:content =>  "Total Disbursements", :colspan => 2},"",fm(@accounting_data['total_disbursements'])],
                [{:content =>  " ", :colspan => 2}," "," "], 
                [{:content =>  "Cash Deposit", :colspan => 2},"105",fm(@accounting_data['cash_deposit'])],
                [{:content =>  "Charge Deposit", :colspan => 2}, "106",fm(@accounting_data['charge_deposit'])],
