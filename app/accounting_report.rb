@@ -2,7 +2,6 @@
 
 def get_shift_ids  
   @shift_ids = []
-
   #URL-encode all parameters
   parameters = URI.encode_www_form(
     'begin_time' => @begin_time,
@@ -215,14 +214,14 @@ def do_the_math(payments)
   
   cash_deposit = cash_sales + check_sales + gift_card_sales - cash_disbursements + cash_refund 
   
-  city_tax = food_sales + abc_total + retail_sales 
+  city_tax = food_sales + abc_total 
 
   total_receipts = charge_deposit + cash_deposit + total_disbursements
  
    #add responses to hash
   temp_hash = { 'food_sales'              => food_sales,
                 'abc_sales'               => abc_sales,
-                'city_tax'                => city_tax * 0.06000,
+                'city_tax'                => city_tax * 0.07500,
                 'total'                   => food_sales + gift_cards_sold + taxes +  abc_total + retail_sales,
                 'retail_sales'            => retail_sales,
                 'tax_collected'           => taxes,
